@@ -173,6 +173,7 @@ void SITL_State::_fdm_input_step(void)
                     _sitl->state.airspeed, _sitl->state.altitude);
         _update_barometer(_sitl->state.altitude);
         _update_compass(_sitl->state.rollDeg, _sitl->state.pitchDeg, _sitl->state.yawDeg);
+        _update_rangefinder(_sitl->state.range);
 
         if (_sitl->adsb_plane_count >= 0 &&
             adsb == nullptr) {
