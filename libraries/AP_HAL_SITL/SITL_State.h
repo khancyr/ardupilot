@@ -85,6 +85,7 @@ private:
     void set_height_agl(void);
     void _update_barometer(float height);
     void _update_compass(float rollDeg, float pitchDeg, float yawDeg);
+    void _update_rangefinder(float range_value);
 
     void _set_signal_handlers(void) const;
 
