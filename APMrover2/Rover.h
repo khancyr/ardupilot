@@ -386,6 +386,11 @@ private:
     // we need to run the speed controller
     bool auto_throttle_mode;
 
+    // Guided control
+    GuidedMode guided_mode;             // controls which controller is run (waypoint or velocity)
+    float guided_target_steer_speed;   // target heading in centi-degrees
+    float guided_target_speed;          // target speed in m/s
+
     // Store the time the last GPS message was received.
     uint32_t last_gps_msg_ms{0};
 
@@ -395,9 +400,6 @@ private:
         float target_speed;
         uint32_t msg_time_ms;
     } guided_yaw_speed;
-
-    // Guided
-    GuidedMode guided_mode;  // stores which GUIDED mode the vehicle is in
 
 private:
     // private member functions
@@ -467,6 +469,7 @@ private:
     void set_servos(void);
     void set_auto_WP(const struct Location& loc);
     void set_guided_WP(const struct Location& loc);
+    void set_guided_velocity(float target_steer_speed, float target_speed);
     void init_home();
     void restart_nav();
     void exit_mission();
@@ -559,6 +562,7 @@ private:
     void update_home();
     void accel_cal_update(void);
     void nav_set_yaw_speed();
+    void nav_set_speed();
     bool in_stationary_loiter(void);
     void set_loiter_active(const AP_Mission::Mission_Command& cmd);
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);

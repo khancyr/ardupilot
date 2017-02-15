@@ -1,14 +1,4 @@
 #include "Rover.h"
-
-/* Functions in this file:
-    void set_next_WP(const AP_Mission::Mission_Command& cmd)
-    void set_guided_WP(void)
-    void init_home()
-    void restart_nav()
-************************************************************
-*/
-
-
 /*
  *  set_auto_WP - sets the target location the vehicle should drive to in Auto mode
  */
@@ -39,6 +29,7 @@ void Rover::set_auto_WP(const struct Location& loc)
 
 void Rover::set_guided_WP(const struct Location& loc)
 {
+    guided_mode = Guided_WP;
     // copy the current location into the OldWP slot
     // ---------------------------------------
     prev_WP = current_loc;
@@ -46,10 +37,25 @@ void Rover::set_guided_WP(const struct Location& loc)
     // Load the next_WP slot
     // ---------------------
     next_WP = loc;
-
+    guided_target_speed = g.speed_cruise;
     // this is handy for the groundstation
     wp_totalDistance = get_distance(current_loc, next_WP);
     wp_distance      = wp_totalDistance;
+
+    rover.rtl_complete = false;
+}
+
+void Rover::set_guided_velocity(float target_steer_speed, float target_speed)
+{
+    guided_mode = Guided_Velocity;
+    guided_target_steer_speed = target_steer_speed;
+    guided_target_speed = target_speed;
+
+    next_WP = current_loc;
+    lateral_acceleration = 0;
+    // this is handy for the groundstation
+    wp_totalDistance = 0;
+    wp_distance      = 0;
 
     rover.rtl_complete = false;
 }
