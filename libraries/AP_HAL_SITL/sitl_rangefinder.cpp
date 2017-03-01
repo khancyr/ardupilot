@@ -18,7 +18,6 @@ extern const AP_HAL::HAL& hal;
 
 using namespace HALSITL;
 
-// TODO Improve that to not use analog
 /*
   setup the rangefinder with new input
  */
@@ -46,23 +45,24 @@ void SITL_State::_update_rangefinder(float range_value)
     }
 
     float voltage = 5.0f;
-    if (fabsf(_sitl->state.rollDeg) < 90 &&
-            fabsf(_sitl->state.pitchDeg) < 90) {
-        // adjust for apparent altitude with roll
-        altitude /= cosf(radians(_sitl->state.rollDeg)) * cosf(radians(_sitl->state.pitchDeg));
+    if (range_value == -1) {
+        if (fabsf(_sitl->state.rollDeg) < 90 &&
+                fabsf(_sitl->state.pitchDeg) < 90) {
+            // adjust for apparent altitude with roll
+            altitude /= cosf(radians(_sitl->state.rollDeg)) * cosf(radians(_sitl->state.pitchDeg));
 
-        altitude += _sitl->sonar_noise * _rand_float();
-
-        // Altitude in in m, scaler in meters/volt
-        voltage = altitude / _sitl->sonar_scale;
-        voltage = constrain_float(voltage, 0, 5.0f);
-
-        if (_sitl->sonar_glitch >= (_rand_float() + 1.0f)/2.0f) {
-            voltage = 5.0f;
+            altitude += _sitl->sonar_noise * _rand_float();
         }
     }
+    // Altitude in in m, scaler in meters/volt
+    voltage = altitude / _sitl->sonar_scale;
+    voltage = constrain_float(voltage, 0, 5.0f);
 
-    sonar_pin_value = 1023*(voltage / 5.0f);
+    if (!is_zero(_sitl->sonar_glitch) && _sitl->sonar_glitch >= (_rand_float() + 1.0f)/2.0f) {
+        voltage = 5.0f;
+    }
+
+    sonar_pin_value = 1023 * (voltage / 5.0f);
 }
 
 #endif
