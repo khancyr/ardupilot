@@ -18,7 +18,6 @@ extern const AP_HAL::HAL& hal;
 
 using namespace HALSITL;
 
-// TODO Improve that to not use analog
 /*
   setup the rangefinder with new input
  */
