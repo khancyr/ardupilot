@@ -328,9 +328,9 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
         smooth_sensors();
     }
     fdm.timestamp_us = time_now_us;
-    fdm.latitude  = location.lat * 1.0e-7;
-    fdm.longitude = location.lng * 1.0e-7;
-    fdm.altitude  = location.alt * 1.0e-2;
+    fdm.latitude  = location.lat * 1.0e-7f;
+    fdm.longitude = location.lng * 1.0e-7f;
+    fdm.altitude  = location.alt * 1.0e-2f;
     fdm.heading   = degrees(atan2f(velocity_ef.y, velocity_ef.x));
     fdm.speedN    = velocity_ef.x;
     fdm.speedE    = velocity_ef.y;
@@ -369,9 +369,9 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
         fdm.speedN    = smoothing.velocity_ef.x;
         fdm.speedE    = smoothing.velocity_ef.y;
         fdm.speedD    = smoothing.velocity_ef.z;
-        fdm.latitude  = smoothing.location.lat * 1.0e-7;
-        fdm.longitude = smoothing.location.lng * 1.0e-7;
-        fdm.altitude  = smoothing.location.alt * 1.0e-2;
+        fdm.latitude  = smoothing.location.lat * 1.0e-7f;
+        fdm.longitude = smoothing.location.lng * 1.0e-7f;
+        fdm.altitude  = smoothing.location.alt * 1.0e-2f;
     }
 
     if (last_speedup != sitl->speedup && sitl->speedup > 0) {

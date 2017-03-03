@@ -9,21 +9,21 @@ namespace SITL {
 struct sitl_fdm {
     // this is the structure passed between FDM models and the main SITL code
     uint64_t timestamp_us;
-    double latitude, longitude; // degrees
-    double altitude;  // MSL
-    double heading;   // degrees
-    double speedN, speedE, speedD; // m/s
-    double xAccel, yAccel, zAccel;       // m/s/s in body frame
-    double rollRate, pitchRate, yawRate; // degrees/s/s in body frame
-    double rollDeg, pitchDeg, yawDeg;    // euler angles, degrees
-    double airspeed; // m/s
-    double battery_voltage; // Volts
-    double battery_current; // Amps
-    double rpm1;            // main prop RPM
-    double rpm2;            // secondary RPM
+    float latitude, longitude; // degrees
+    float altitude;  // MSL
+    float heading;   // degrees
+    float speedN, speedE, speedD; // m/s
+    float xAccel, yAccel, zAccel;       // m/s/s in body frame
+    float rollRate, pitchRate, yawRate; // degrees/s/s in body frame
+    float rollDeg, pitchDeg, yawDeg;    // euler angles, degrees
+    float airspeed; // m/s
+    float battery_voltage; // Volts
+    float battery_current; // Amps
+    float rpm1;            // main prop RPM
+    float rpm2;            // secondary RPM
     uint8_t rcin_chan_count;
     float  rcin[8];         // RC input 0..1
-    double range;           // rangefinder value
+    float range;           // rangefinder value
     Vector3f bodyMagField;  // Truth XYZ magnetic field vector in body-frame. Includes motor interference. Units are milli-Gauss.
     Vector3f angAccel; // Angular acceleration in degrees/s/s about the XYZ body axes
 };
