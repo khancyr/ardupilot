@@ -107,7 +107,7 @@ void Gazebo::recv_fdm(const struct sitl_input &input)
                     static_cast<float>(pkt.imu_angular_velocity_rpy[2]));
 
     // compute dcm from imu orientation
-    Quaternion quat(static_cast<float>(pkt.imu_orientation_quat[0]),
+    const Quaternion quat(static_cast<float>(pkt.imu_orientation_quat[0]),
                     static_cast<float>(pkt.imu_orientation_quat[1]),
                     static_cast<float>(pkt.imu_orientation_quat[2]),
                     static_cast<float>(pkt.imu_orientation_quat[3]));
@@ -121,6 +121,31 @@ void Gazebo::recv_fdm(const struct sitl_input &input)
                         static_cast<float>(pkt.position_xyz[1]),
                         static_cast<float>(pkt.position_xyz[2]));
 
+    // get GPS position [degrees]->[degrees * 10^7], [m]->[cm]
+    /* DISABLED UNTIL GAZEBO ALL TO CHANGE GPS FRAME FROM ENU TO NED
+     * OTHERWISE THE GPS VALUE ARE WRONG ...
+    location.lat = static_cast<int32_t>(pkt.latitude * 1.0e7);
+    location.lng = static_cast<int32_t>(pkt.longitude * 1.0e7);
+    location.alt = static_cast<int32_t>(pkt.altitude * 1.0e2);
+    */
+    location.lat = 0;
+    location.lng = 0;
+    location.alt  = static_cast<int32_t>(home.alt - position.z * 100.0f);
+
+    if (!_use_gazebo_gps && location.lat != 0 && location.lng != 0) {
+        _use_gazebo_gps = true;
+    }
+
+    // Default : airspeed == 0 -> no wind
+    airspeed = static_cast<float>(pkt.airspeed);
+    airspeed_pitot = static_cast<float>(pkt.airspeed);
+
+    // Default : battery_voltage == -1 -> use SITL estimator
+    battery_voltage = static_cast<float>(pkt.battery_voltage);
+    battery_current = static_cast<float>(pkt.battery_current);
+
+    // Default : rangefinder == -1 -> use SITL rangefinder
+    range = static_cast<float>(pkt.rangefinder);
 
     // auto-adjust to simulation frame rate
     time_now_us += static_cast<uint64_t>(deltat * 1.0e6);
@@ -129,7 +154,6 @@ void Gazebo::recv_fdm(const struct sitl_input &input)
         adjust_frame_time(static_cast<float>(1.0/deltat));
     }
     last_timestamp = pkt.timestamp;
-
 }
 
 /*
@@ -152,7 +176,6 @@ void Gazebo::drain_sockets()
             // fprintf(stderr, "received from control socket: %s\n", buf);
         }
     } while (received > 0);
-
 }
 
 /*
@@ -162,8 +185,9 @@ void Gazebo::update(const struct sitl_input &input)
 {
     send_servos(input);
     recv_fdm(input);
-    update_position();
-
+    if (!_use_gazebo_gps) {
+        update_position();
+    }
     time_advance();
     // update magnetic field
     update_mag_field_bf();
