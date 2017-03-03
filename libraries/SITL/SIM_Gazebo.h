@@ -60,6 +60,13 @@ private:
       double imu_orientation_quat[4];
       double velocity_xyz[3];
       double position_xyz[3];
+      double latitude;
+      double longitude;
+      double altitude;
+      double airspeed;
+      double battery_voltage;
+      double battery_current;
+      double rangefinder;
     };
 
     void recv_fdm(const struct sitl_input &input);
@@ -71,6 +78,7 @@ private:
     SocketAPM socket_sitl;
     const char *_gazebo_address = "127.0.0.1";
     int _gazebo_port = 9002;
+    bool _use_gazebo_gps = false;
     static const uint64_t GAZEBO_TIMEOUT_US = 5000000;
 };
 
