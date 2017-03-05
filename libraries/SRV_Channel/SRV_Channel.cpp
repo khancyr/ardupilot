@@ -133,7 +133,7 @@ void SRV_Channel::calc_pwm(int16_t output_scaled)
 
 void SRV_Channel::set_output_pwm(uint16_t pwm)
 {
-    output_pwm = pwm;
+    output_pwm = static_cast<uint16_t>(constrain_int16(static_cast<int16_t>(pwm), servo_min, servo_max));
     have_pwm_mask |= (1U<<ch_num);
 }
 
