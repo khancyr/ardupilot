@@ -389,9 +389,9 @@ void SITL_State::_simulator_servos(SITL::Aircraft::sitl_input &input)
         // add in engine multiplier
         if (input.servos[2] != 1500) {
             input.servos[2] = ((input.servos[2]-1500) * engine_mul) + 1500;
-            if (input.servos[2] > 2000) input.servos[2] = 2000;
-            if (input.servos[2] < 1000) input.servos[2] = 1000;
+            input.servos[2] = constrain_int16(static_cast<int16_t>(input.servos[2]), 1000, 2000);
         }
+        input.servos[0] = constrain_int16(static_cast<int16_t>(input.servos[0]), 1000, 2000);
         motors_on = ((input.servos[2]-1500)/500.0f) != 0;
     } else {
         motors_on = false;
