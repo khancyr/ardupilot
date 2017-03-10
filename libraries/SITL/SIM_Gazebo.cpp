@@ -122,15 +122,12 @@ void Gazebo::recv_fdm(const struct sitl_input &input)
                         static_cast<float>(pkt.position_xyz[2]));
 
     // get GPS position [degrees]->[degrees * 10^7], [m]->[cm]
-    /* DISABLED UNTIL GAZEBO ALL TO CHANGE GPS FRAME FROM ENU TO NED
-     * OTHERWISE THE GPS VALUE ARE WRONG ...
+    /* Gazebo GPS is NWU so its the world heading must be turn by 90 degree */
     location.lat = static_cast<int32_t>(pkt.latitude * 1.0e7);
     location.lng = static_cast<int32_t>(pkt.longitude * 1.0e7);
     location.alt = static_cast<int32_t>(pkt.altitude * 1.0e2);
-    */
-    location.lat = 0;
-    location.lng = 0;
-    location.alt  = static_cast<int32_t>(home.alt - position.z * 100.0f);
+
+    //location.alt  = static_cast<int32_t>(home.alt - position.z * 100.0f);
 
     if (!_use_gazebo_gps && location.lat != 0 && location.lng != 0) {
         _use_gazebo_gps = true;
