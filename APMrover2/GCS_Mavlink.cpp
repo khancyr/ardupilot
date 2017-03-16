@@ -1349,6 +1349,13 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
                 }
                 target_speed = vely;
                 target_steer_speed = RAD_TO_DEG * packet.yaw_rate;
+                if (target_speed >= 0.0f) {
+                    rover.in_guided_reverse = false;
+                    rover.set_reverse(false);
+                } else {
+                    rover.in_guided_reverse = true;
+                    rover.set_reverse(true);
+                }
                 // TODO : handle yaw heading cmd
             }
 
@@ -1408,6 +1415,13 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
                 // use packet vy (forward in NED) for speed in m/s and packet yaw_rate for turn in rad/s
                 target_speed = packet.vy;
                 target_steer_speed = RAD_TO_DEG * packet.yaw_rate;
+                if (target_speed >= 0.0f) {
+                    rover.in_guided_reverse = false;
+                    rover.set_reverse(false);
+                } else {
+                    rover.in_guided_reverse = true;
+                    rover.set_reverse(true);
+                }
                 // TODO : handle yaw heading cmd
             }
 

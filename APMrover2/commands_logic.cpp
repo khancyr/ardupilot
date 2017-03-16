@@ -403,17 +403,19 @@ void Rover::nav_set_speed()
         if (!in_auto_reverse) {
             set_reverse(false);
         }
+        in_guided_reverse = false;
         return;
     }
     prev_WP = current_loc;
     next_WP = current_loc;
+    int32_t steer_value = 0;
+    if (!is_zero(guided_control.target_steer_speed)) {
+        steer_value = steerController.get_steering_out_rate(guided_control.target_steer_speed);
+    }
 
-    const int32_t steer_value = steerController.get_steering_out_rate(guided_control.target_steer_speed);
-    if ( guided_control.target_speed >= 0.0f ) {
-        set_reverse(false);
+    if (!in_reverse) {
         location_update(next_WP, (steer_value + ahrs.yaw_sensor) * 0.01f, 4.0f);  // put the next wp at 4m forward at steer direction
     } else {
-        set_reverse(true);
         location_update(next_WP, (steer_value + ahrs.yaw_sensor) * 0.01f, -4.0f);  // put the next wp at 4m backward at steer direction
     }
     nav_controller->update_waypoint(current_loc, next_WP);

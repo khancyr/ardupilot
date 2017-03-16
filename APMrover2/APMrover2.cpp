@@ -448,8 +448,8 @@ void Rover::update_current_mode(void)
         break;
 
     case GUIDED: {
-        if (!in_auto_reverse) {
-            set_reverse(false);
+        if (!in_auto_reverse && !in_guided_reverse) {
+           set_reverse(false);
         }
         switch (guided_mode){
         case Guided_Angle:
