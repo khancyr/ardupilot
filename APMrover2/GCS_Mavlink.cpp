@@ -1349,7 +1349,6 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
                 }
                 target_speed = vely;
                 target_steer_speed = RAD_TO_DEG * packet.yaw_rate;
-                // TODO : take into account reverse speed
                 // TODO : handle yaw heading cmd
             }
 
@@ -1409,7 +1408,6 @@ void GCS_MAVLINK_Rover::handleMessage(mavlink_message_t* msg)
                 // use packet vy (forward in NED) for speed in m/s and packet yaw_rate for turn in rad/s
                 target_speed = packet.vy;
                 target_steer_speed = RAD_TO_DEG * packet.yaw_rate;
-                // TODO : take into account reverse speed
                 // TODO : handle yaw heading cmd
             }
 
