@@ -14,35 +14,7 @@
 */
 void AP_InertialNav_NavEKF::update(float dt)
 {
-    // get the NE position relative to the local earth frame origin
-    Vector2f posNE;
-    if (_ahrs_ekf.get_relative_position_NE_origin(posNE)) {
-        _relpos_cm.x = posNE.x * 100; // convert from m to cm
-        _relpos_cm.y = posNE.y * 100; // convert from m to cm
-    }
 
-    // get the D position relative to the local earth frame origin
-    float posD;
-    if (_ahrs_ekf.get_relative_position_D_origin(posD)) {
-        _relpos_cm.z = - posD * 100; // convert from m in NED to cm in NEU
-    }
-
-    // get the absolute WGS-84 position
-    _haveabspos = _ahrs_ekf.get_position(_abspos);
-
-    // get the velocity relative to the local earth frame
-    Vector3f velNED;
-    if (_ahrs_ekf.get_velocity_NED(velNED)) {
-        _velocity_cm = velNED * 100; // convert to cm/s
-        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
-    }
-
-    // Get a derivative of the vertical position which is kinematically consistent with the vertical position is required by some control loops.
-    // This is different to the vertical velocity from the EKF which is not always consistent with the vertical position due to the various errors that are being corrected for.
-    if (_ahrs_ekf.get_vert_pos_rate(_pos_z_rate)) {
-        _pos_z_rate *= 100; // convert to cm/s
-        _pos_z_rate = - _pos_z_rate; // InertialNav is NEU
-    }
 }
 
 /**
@@ -50,8 +22,16 @@ void AP_InertialNav_NavEKF::update(float dt)
  *
  * @return
  */
-const Vector3f &AP_InertialNav_NavEKF::get_position(void) const 
+const Vector3f &AP_InertialNav_NavEKF::get_position(void) const
 {
+    // get the NED position relative to the local earth frame origin
+    Vector3f posNED;
+    Vector3f _relpos_cm;   // NEU
+    if (_ahrs_ekf.get_relative_position_NED_origin(posNED)) {
+        _relpos_cm.x = posNED.x * 100.0f; // convert from m to cm
+        _relpos_cm.y = posNED.y * 100.0f; // convert from m to cm
+        _relpos_cm.z = - posNED.z * 100.0f; // convert from m in NED to cm in NEU
+    }
     return _relpos_cm;
 }
 
@@ -60,6 +40,9 @@ const Vector3f &AP_InertialNav_NavEKF::get_position(void) const
  */
 int32_t AP_InertialNav_NavEKF::get_latitude() const
 {
+    // get the absolute WGS-84 position
+    struct Location _abspos;
+    _ahrs_ekf.get_position(_abspos);
     return _abspos.lat;
 }
 
@@ -69,6 +52,9 @@ int32_t AP_InertialNav_NavEKF::get_latitude() const
  */
 int32_t AP_InertialNav_NavEKF::get_longitude() const
 {
+    // get the absolute WGS-84 position
+    struct Location _abspos;
+    _ahrs_ekf.get_position(_abspos);
     return _abspos.lng;
 }
 
@@ -82,6 +68,13 @@ int32_t AP_InertialNav_NavEKF::get_longitude() const
  */
 const Vector3f &AP_InertialNav_NavEKF::get_velocity() const
 {
+    // get the velocity relative to the local earth frame
+    Vector3f velNED;
+    Vector3f _velocity_cm; // NEU
+    if (_ahrs_ekf.get_velocity_NED(velNED)) {
+        _velocity_cm = velNED * 100.0f; // convert to cm/s
+        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
+    }
     return _velocity_cm;
 }
 
@@ -92,6 +85,13 @@ const Vector3f &AP_InertialNav_NavEKF::get_velocity() const
  */
 float AP_InertialNav_NavEKF::get_velocity_xy() const
 {
+    // get the velocity relative to the local earth frame
+    Vector3f velNED;
+    Vector3f _velocity_cm; // NEU
+    if (_ahrs_ekf.get_velocity_NED(velNED)) {
+        _velocity_cm = velNED * 100.0f; // convert to cm/s
+        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
+    }
     return norm(_velocity_cm.x, _velocity_cm.y);
 }
 
@@ -100,6 +100,13 @@ float AP_InertialNav_NavEKF::get_velocity_xy() const
 */
 float AP_InertialNav_NavEKF::get_pos_z_derivative() const
 {
+    // Get a derivative of the vertical position which is kinematically consistent with the vertical position is required by some control loops.
+    // This is different to the vertical velocity from the EKF which is not always consistent with the vertical position due to the various errors that are being corrected for.
+    float _pos_z_rate;
+    if (_ahrs_ekf.get_vert_pos_rate(_pos_z_rate)) {
+        _pos_z_rate *= 100.0f; // convert to cm/s
+        _pos_z_rate = - _pos_z_rate; // InertialNav is NEU
+    }
     return _pos_z_rate;
 }
 
@@ -109,6 +116,14 @@ float AP_InertialNav_NavEKF::get_pos_z_derivative() const
  */
 float AP_InertialNav_NavEKF::get_altitude() const
 {
+    // get the NED position relative to the local earth frame origin
+    Vector3f posNED;
+    Vector3f _relpos_cm;   // NEU
+    if (_ahrs_ekf.get_relative_position_NED_origin(posNED)) {
+        _relpos_cm.x = posNED.x * 100.0f; // convert from m to cm
+        _relpos_cm.y = posNED.y * 100.0f; // convert from m to cm
+        _relpos_cm.z = - posNED.z * 100.0f; // convert from m in NED to cm in NEU
+    }
     return _relpos_cm.z;
 }
 
@@ -152,6 +167,12 @@ bool AP_InertialNav_NavEKF::get_hgt_ctrl_limit(float& limit) const
  */
 float AP_InertialNav_NavEKF::get_velocity_z() const
 {
+    Vector3f velNED;
+    Vector3f _velocity_cm; // NEU
+    if (_ahrs_ekf.get_velocity_NED(velNED)) {
+        _velocity_cm = velNED * 100.0f; // convert to cm/s
+        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
+    }
     return _velocity_cm.z;
 }
 

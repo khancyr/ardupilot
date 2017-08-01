@@ -94,10 +94,10 @@ public:
     float       get_velocity_z() const;
 
 private:
-    Vector3f _relpos_cm;   // NEU
-    Vector3f _velocity_cm; // NEU
-    float _pos_z_rate;
-    struct Location _abspos;
+
+
+
+
     bool _haveabspos;
     AP_AHRS_NavEKF &_ahrs_ekf;
 };
