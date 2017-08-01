@@ -377,7 +377,9 @@ void Copter::auto_land_start(const Vector3f& destination)
     // initialise position and desired velocity
     if (!pos_control->is_active_z()) {
         pos_control->set_alt_target(inertial_nav.get_altitude());
-        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+        Vector3f vel;
+        ahrs.get_velocity_NEU_cm(vel);
+        pos_control->set_desired_velocity_z(vel.z);
     }
 
     // initialise yaw
@@ -795,7 +797,9 @@ void Copter::auto_payload_place_start(const Vector3f& destination)
     // initialise position and desired velocity
     if (!pos_control->is_active_z()) {
         pos_control->set_alt_target(inertial_nav.get_altitude());
-        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+        Vector3f vel;
+        ahrs.get_velocity_NEU_cm(vel);
+        pos_control->set_desired_velocity_z(vel.z);
     }
 
     // initialise yaw

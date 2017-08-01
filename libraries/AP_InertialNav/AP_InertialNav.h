@@ -71,14 +71,6 @@ public:
      */
     virtual bool       get_hgt_ctrl_limit(float& limit) const = 0;
 
-    /**
-     * get_velocity_z - returns the current climbrate.
-     *
-     * @see get_velocity().z
-     *
-     * @return climbrate in cm/s (positive up)
-     */
-    virtual float       get_velocity_z() const = 0;
 };
 
 #if AP_AHRS_NAVEKF_AVAILABLE

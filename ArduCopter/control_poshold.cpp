@@ -94,7 +94,9 @@ bool Copter::poshold_init(bool ignore_checks)
     // initialise position and desired velocity
     if (!pos_control->is_active_z()) {
         pos_control->set_alt_target_to_current_alt();
-        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+        Vector3f vel;
+        ahrs.get_velocity_NEU_cm(vel);
+        pos_control->set_desired_velocity_z(vel.z);
     }
 
     // initialise lean angles to current attitude

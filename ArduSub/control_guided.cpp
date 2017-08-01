@@ -126,7 +126,9 @@ void Sub::guided_angle_control_start()
 
     // initialise position and desired velocity
     pos_control.set_alt_target(inertial_nav.get_altitude());
-    pos_control.set_desired_velocity_z(inertial_nav.get_velocity_z());
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
+    pos_control->set_desired_velocity_z(vel.z);
 
     // initialise targets
     guided_angle_state.update_time_ms = millis();

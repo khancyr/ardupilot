@@ -104,22 +104,5 @@ bool AP_InertialNav_NavEKF::get_hgt_ctrl_limit(float& limit) const
     return false;
 }
 
-/**
- * get_velocity_z - returns the current climbrate.
- *
- * @see get_velocity().z
- *
- * @return climbrate in cm/s
- */
-float AP_InertialNav_NavEKF::get_velocity_z() const
-{
-    Vector3f velNED;
-    Vector3f _velocity_cm; // NEU
-    if (_ahrs_ekf.get_velocity_NED(velNED)) {
-        _velocity_cm = velNED * 100.0f; // convert to cm/s
-        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
-    }
-    return _velocity_cm.z;
-}
 
 #endif // AP_AHRS_NAVEKF_AVAILABLE

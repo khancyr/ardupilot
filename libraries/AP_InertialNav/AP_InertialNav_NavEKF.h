@@ -58,14 +58,6 @@ public:
      */
     bool       get_hgt_ctrl_limit(float& limit) const;
 
-    /**
-     * get_velocity_z - returns the current climbrate.
-     *
-     * @see get_velocity().z
-     *
-     * @return climbrate in cm/s
-     */
-    float       get_velocity_z() const;
 
 private:
 

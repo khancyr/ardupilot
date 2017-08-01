@@ -22,10 +22,9 @@ void Copter::update_ground_effect_detector(void)
         vel_target.z = 0.0f;
         xy_des_speed_cms = vel_target.length();
     }
-
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
     if (position_ok() || optflow_position_ok()) {
-        Vector3f vel;
-        ahrs.get_velocity_NEU_cm(vel);
         vel.z = 0.0f;
         xy_speed_cms = vel.length();
     }
@@ -59,7 +58,7 @@ void Copter::update_ground_effect_detector(void)
 
     bool descent_demanded = pos_control->is_active_z() && des_climb_rate_cms < 0.0f;
     bool slow_descent_demanded = descent_demanded && des_climb_rate_cms >= -100.0f;
-    bool z_speed_low = fabsf(inertial_nav.get_velocity_z()) <= 60.0f;
+    bool z_speed_low = fabsf(vel.z) <= 60.0f;
     bool slow_descent = (slow_descent_demanded || (z_speed_low && descent_demanded));
 
     gndeffect_state.touchdown_expected = slow_horizontal && slow_descent;

@@ -232,8 +232,10 @@ void AC_PosControl::relax_alt_hold_controllers(float throttle_setting)
     _pos_target.z = _ahrs.get_altitude();
     _vel_desired.z = 0.0f;
     _flags.use_desvel_ff_z = false;
-    _vel_target.z = _ahrs.get_velocity_z();
-    _vel_last.z = _ahrs.get_velocity_z();
+    Vector3f vel;
+    _ahrs.get_velocity_NEU_cm(vel);
+    _vel_target.z = vel.z;
+    _vel_last.z = vel.z;
     _accel_feedforward.z = 0.0f;
     _accel_last_z_cms = 0.0f;
     _accel_target.z = -(_ahrs_view.get_accel_ef_blended().z + GRAVITY_MSS) * 100.0f;
@@ -260,7 +262,9 @@ void AC_PosControl::set_target_to_stopping_point_z()
 void AC_PosControl::get_stopping_point_z(Vector3f& stopping_point) const
 {
     const float curr_pos_z = _ahrs.get_altitude();
-    float curr_vel_z = _ahrs.get_velocity_z();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
+    float curr_vel_z = curr_vel.z;
 
     float linear_distance;  // half the distance we swap between linear and sqrt and the distance we offset sqrt
     float linear_velocity;  // the velocity we swap between linear and sqrt
