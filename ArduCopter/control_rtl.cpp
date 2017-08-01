@@ -348,10 +348,7 @@ void Copter::rtl_land_start()
 
     // initialise position and desired velocity
     if (!pos_control->is_active_z()) {
-        pos_control->set_alt_target_to_current_alt();
-        Vector3f vel;
-        ahrs.get_velocity_NEU_cm(vel);
-        pos_control->set_desired_velocity_z(vel.z);
+        pos_control->init_vel_controller_z();
     }
 
     // initialise yaw

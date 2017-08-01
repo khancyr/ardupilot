@@ -658,10 +658,7 @@ bool Sub::auto_terrain_recover_start()
     pos_control.set_accel_z(wp_nav.get_accel_z());
 
     // Reset vertical position and velocity targets
-    pos_control.set_alt_target(inertial_nav.get_altitude());
-    Vector3f vel;
-    ahrs.get_velocity_NEU_cm(vel);
-    pos_control->set_desired_velocity_z(vel.z);
+    pos_control.init_vel_controller_z();
 
     gcs().send_text(MAV_SEVERITY_WARNING, "Attempting auto failsafe recovery");
     return true;

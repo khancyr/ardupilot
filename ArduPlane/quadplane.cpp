@@ -748,10 +748,7 @@ void QuadPlane::run_z_controller(void)
         // set alt target to current height on transition. This
         // starts the Z controller off with the right values
         gcs().send_text(MAV_SEVERITY_INFO, "Reset alt target to %.1f", (double)inertial_nav.get_altitude());
-        pos_control->set_alt_target(inertial_nav.get_altitude());
-        Vector3f vel;
-        ahrs.get_velocity_NEU_cm(vel);
-        pos_control->set_desired_velocity_z(vel.z);
+        pos_control->init_vel_controller_z();
 
         // initialize vertical speeds and leash lengths
         pos_control->set_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
@@ -778,10 +775,7 @@ void QuadPlane::init_hover(void)
     pos_control->set_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
-    pos_control->set_alt_target(inertial_nav.get_altitude());
-    Vector3f vel;
-    ahrs.get_velocity_NEU_cm(vel);
-    pos_control->set_desired_velocity_z(vel.z);
+    pos_control->init_vel_controller_z();
 
     init_throttle_wait();
 }
@@ -844,10 +838,7 @@ void QuadPlane::init_loiter(void)
     pos_control->set_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
-    pos_control->set_alt_target(inertial_nav.get_altitude());
-    Vector3f vel;
-    ahrs.get_velocity_NEU_cm(vel);
-    pos_control->set_desired_velocity_z(vel.z);
+    pos_control->init_vel_controller_z();
 
     init_throttle_wait();
 }
@@ -1990,10 +1981,7 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
     pos_control->set_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
-    pos_control->set_alt_target(inertial_nav.get_altitude());
-    Vector3f vel;
-    ahrs.get_velocity_NEU_cm(vel);
-    pos_control->set_desired_velocity_z(vel.z);
+    pos_control->init_vel_controller_z();
     
     // also update nav_controller for status output
     plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);
