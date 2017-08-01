@@ -52,13 +52,6 @@ public:
      */
     virtual int32_t     get_longitude() const = 0;
 
-    /**
-     * get_velocity_xy - returns the current horizontal velocity in cm/s
-     *
-     * @returns the current horizontal velocity in cm/s
-     */
-    virtual float get_velocity_xy() const = 0;
-
     //
     // Z Axis methods
     //
