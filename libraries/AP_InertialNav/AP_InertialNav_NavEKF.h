@@ -23,14 +23,6 @@ public:
     void        update(float dt);
 
 
-    /**
-     * get_hgt_ctrl_limit - get maximum height to be observed by the control loops in cm and a validity flag
-     * this is used to limit height during optical flow navigation
-     * it will return invalid when no limiting is required
-     * @return
-     */
-    bool       get_hgt_ctrl_limit(float& limit) const;
-
 
 private:
 
