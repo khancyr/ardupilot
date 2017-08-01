@@ -24,12 +24,6 @@ public:
 
 
     /**
-     * get_pos_z_derivative - returns the derivative of the z position in cm/s
-    */
-    float    get_pos_z_derivative() const;
-
-
-    /**
      * getHgtAboveGnd - get latest altitude estimate above ground level in centimetres and validity flag
      * @return
      */
