@@ -6,7 +6,6 @@
 #include <AP_Math/AP_Math.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_AHRS/AP_AHRS.h>
-#include <AP_InertialNav/AP_InertialNav.h>     // Inertial Navigation library
 #include <AC_Fence/AC_PolyFence_loader.h>
 #include <AP_Common/Location.h>
 
@@ -37,7 +36,7 @@ class AC_Fence
 public:
 
     /// Constructor
-    AC_Fence(const AP_AHRS_NavEKF& ahrs, const AP_InertialNav& inav);
+    AC_Fence(const AP_AHRS_NavEKF& ahrs);
 
     /// enable - allows fence to be enabled/disabled.  Note: this does not update the eeprom saved value
     void enable(bool value);
@@ -129,7 +128,6 @@ private:
 
     // pointers to other objects we depend upon
     const AP_AHRS_NavEKF& _ahrs;
-    const AP_InertialNav& _inav;
 
     // parameters
     AP_Int8         _enabled;               // top level enable/disable control

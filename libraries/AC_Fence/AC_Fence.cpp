@@ -73,9 +73,8 @@ const AP_Param::GroupInfo AC_Fence::var_info[] = {
 };
 
 /// Default constructor.
-AC_Fence::AC_Fence(const AP_AHRS_NavEKF& ahrs, const AP_InertialNav& inav) :
+AC_Fence::AC_Fence(const AP_AHRS_NavEKF& ahrs) :
     _ahrs(ahrs),
-    _inav(inav),
     _alt_max_backup(0),
     _circle_radius_backup(0),
     _alt_max_breach_distance(0),

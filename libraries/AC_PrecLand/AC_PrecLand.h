@@ -2,11 +2,11 @@
 
 #include <AP_Common/AP_Common.h>
 #include <AP_Math/AP_Math.h>
-#include <AP_InertialNav/AP_InertialNav.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <stdint.h>
 #include "PosVelEKF.h"
 #include <AP_Buffer/AP_Buffer.h>
+#include <AP_AHRS/AP_AHRS.h>
 
 // declare backend classes
 class AC_PrecLand_Backend;
@@ -43,7 +43,7 @@ public:
     };
 
     // constructor
-    AC_PrecLand(const AP_AHRS_NavEKF& ahrs, const AP_InertialNav& inav);
+    AC_PrecLand(const AP_AHRS_NavEKF& ahrs);
 
     // perform any required initialisation of landing controllers
     void init();
@@ -102,7 +102,6 @@ private:
 
     // references to inertial nav and ahrs libraries
     const AP_AHRS_NavEKF&       _ahrs;
-    const AP_InertialNav&       _inav;
 
     // parameters
     AP_Int8                     _enabled;           // enabled/disabled and behaviour

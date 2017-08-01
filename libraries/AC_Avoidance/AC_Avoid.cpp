@@ -38,9 +38,8 @@ const AP_Param::GroupInfo AC_Avoid::var_info[] = {
 };
 
 /// Constructor
-AC_Avoid::AC_Avoid(const AP_AHRS_NavEKF& ahrs, const AP_InertialNav& inav, const AC_Fence& fence, const AP_Proximity& proximity, const AP_Beacon* beacon)
+AC_Avoid::AC_Avoid(const AP_AHRS_NavEKF& ahrs, const AC_Fence& fence, const AP_Proximity& proximity, const AP_Beacon* beacon)
     : _ahrs(ahrs),
-      _inav(inav),
       _fence(fence),
       _proximity(proximity),
       _beacon(beacon)
