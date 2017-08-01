@@ -18,30 +18,6 @@ void AP_InertialNav_NavEKF::update(float dt)
 }
 
 /**
- * get_latitude - returns the latitude of the current position estimation in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
- */
-int32_t AP_InertialNav_NavEKF::get_latitude() const
-{
-    // get the absolute WGS-84 position
-    struct Location _abspos;
-    _ahrs_ekf.get_position(_abspos);
-    return _abspos.lat;
-}
-
-/**
- * get_longitude - returns the longitude of the current position estimation in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
- * @return
- */
-int32_t AP_InertialNav_NavEKF::get_longitude() const
-{
-    // get the absolute WGS-84 position
-    struct Location _abspos;
-    _ahrs_ekf.get_position(_abspos);
-    return _abspos.lng;
-}
-
-
-/**
  * get_pos_z_derivative - returns the derivative of the z position in cm/s
 */
 float AP_InertialNav_NavEKF::get_pos_z_derivative() const
