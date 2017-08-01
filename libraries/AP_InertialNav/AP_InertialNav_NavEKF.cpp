@@ -40,25 +40,7 @@ int32_t AP_InertialNav_NavEKF::get_longitude() const
     return _abspos.lng;
 }
 
-/**
- * get_velocity - returns the current velocity in cm/s
- *
- * @return velocity vector:
- *      		.x : latitude  velocity in cm/s
- * 				.y : longitude velocity in cm/s
- * 				.z : vertical  velocity in cm/s
- */
-const Vector3f &AP_InertialNav_NavEKF::get_velocity() const
-{
-    // get the velocity relative to the local earth frame
-    Vector3f velNED;
-    Vector3f _velocity_cm; // NEU
-    if (_ahrs_ekf.get_velocity_NED(velNED)) {
-        _velocity_cm = velNED * 100.0f; // convert to cm/s
-        _velocity_cm.z = -_velocity_cm.z; // convert from NED to NEU
-    }
-    return _velocity_cm;
-}
+
 
 /**
  * get_velocity_xy - returns the current horizontal velocity in cm/s

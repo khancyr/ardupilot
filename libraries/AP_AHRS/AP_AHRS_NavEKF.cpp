@@ -640,6 +640,23 @@ bool AP_AHRS_NavEKF::get_velocity_NED(Vector3f &vec) const
     }
 }
 
+/**
+ * get_velocity_NEU - returns the current velocity in cm/s
+ *
+ * @return velocity vector:
+ *      		.x : latitude  velocity in cm/s
+ * 				.y : longitude velocity in cm/s
+ * 				.z : vertical  velocity in cm/s
+ */
+void AP_AHRS_NavEKF::get_velocity_NEU_cm(Vector3f &vec) const
+{
+    // get the velocity relative to the local earth frame
+    if (!get_velocity_NED(vec)) {
+        vec = vec * 100.0f; // convert to cm/s
+        vec.z = -vec.z; // convert from NED to NEU
+    }
+}
+
 // returns the expected NED magnetic field
 bool AP_AHRS_NavEKF::get_mag_field_NED(Vector3f &vec) const
 {
@@ -808,12 +825,11 @@ bool AP_AHRS_NavEKF::get_relative_position_NED_home(Vector3f &vec) const
 // get the NED position relative to the local earth frame origin in cm
 void AP_AHRS_NavEKF::get_relative_position_NEU_origin_cm(Vector3f &vec) const
 {
-    if (!get_relative_position_NED_origin(vec)) {
-        return;
+    if (get_relative_position_NED_origin(vec)) {
+        vec.x = vec.x * 100.0f;    // convert from m to cm
+        vec.y = vec.y * 100.0f;    // convert from m to cm
+        vec.z = - vec.z * 100.0f;  // convert from m in NED to cm in NEU
     }
-    vec.x = vec.x * 100.0f;    // convert from m to cm
-    vec.y = vec.y * 100.0f;    // convert from m to cm
-    vec.z = - vec.z * 100.0f;  // convert from m in NED to cm in NEU
 }
 
 // write a relative ground position estimate to the origin in meters, North/East order

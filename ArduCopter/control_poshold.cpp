@@ -141,7 +141,8 @@ void Copter::poshold_run()
     float controller_to_pilot_roll_mix; // mix of controller and pilot controls.  0 = fully last controller controls, 1 = fully pilot controls
     float controller_to_pilot_pitch_mix;    // mix of controller and pilot controls.  0 = fully last controller controls, 1 = fully pilot controls
     float vel_fw, vel_right;            // vehicle's current velocity in body-frame forward and right directions
-    const Vector3f& vel = inertial_nav.get_velocity();
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
 
     // initialize vertical speeds and acceleration
     pos_control->set_speed_z(-g.pilot_velocity_z_max, g.pilot_velocity_z_max);

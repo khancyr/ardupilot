@@ -256,7 +256,8 @@ void NOINLINE Sub::send_location(mavlink_channel_t chan)
     } else {
         fix_time = millis();
     }
-    const Vector3f &vel = inertial_nav.get_velocity();
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
     mavlink_msg_global_position_int_send(
         chan,
         fix_time,

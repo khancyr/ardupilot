@@ -135,17 +135,18 @@ public:
     bool have_inertial_nav() const override;
 
     bool get_velocity_NED(Vector3f &vec) const override;
+    void get_velocity_NEU_cm(Vector3f &vec) const;
 
     // return the relative position NED to either home or origin
     // return true if the estimate is valid
     bool get_relative_position_NED_home(Vector3f &vec) const override;
     bool get_relative_position_NED_origin(Vector3f &vec) const override;
+    void get_relative_position_NEU_origin_cm(Vector3f &vec) const;
 
     // return the relative position NE to either home or origin
     // return true if the estimate is valid
     bool get_relative_position_NE_home(Vector2f &posNE) const override;
     bool get_relative_position_NE_origin(Vector2f &posNE) const override;
-    void get_relative_position_NEU_origin_cm(Vector3f &vec) const;
 
     // return the relative position down to either home or origin
     // baro will be used for the _home relative one if the EKF isn't

@@ -182,7 +182,8 @@ void AC_WPNav::init_loiter_target()
 {
     Vector3f curr_pos;
     _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
-    const Vector3f& curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
 
     // initialise position controller
     _pos_control.init_xy_controller();
@@ -346,7 +347,8 @@ void AC_WPNav::update_loiter(float ekfGndSpdLimit, float ekfNavVelGainScaler)
 /// init_brake_target - initializes stop position from current position and velocity
 void AC_WPNav::init_brake_target(float accel_cmss)
 {
-    const Vector3f& curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     Vector3f stopping_point;
 
     // initialise position controller
@@ -520,7 +522,8 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     _flags.wp_yaw_set = false;
 
     // initialise the limited speed to current speed along the track
-    const Vector3f &curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     // get speed along track (note: we convert vertical speed into horizontal speed equivalent)
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
     _limited_speed_xy_cms = constrain_float(speed_along_track,0,_wp_speed_cms);
@@ -624,7 +627,8 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     }
 
     // get current velocity
-    const Vector3f &curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     // get speed along track
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
 

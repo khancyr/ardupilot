@@ -183,8 +183,10 @@ void Copter::throw_run()
     if ((throw_state.stage != throw_state.prev_stage) || (now - throw_state.last_log_ms) > 100) {
         throw_state.prev_stage = throw_state.stage;
         throw_state.last_log_ms = now;
-        float velocity = inertial_nav.get_velocity().length();
-        float velocity_z = inertial_nav.get_velocity().z;
+        Vector3f curr_vel;
+        ahrs.get_velocity_NEU_cm(curr_vel);
+        const float velocity = curr_vel.length();
+        const float velocity_z = curr_vel.z;
         float accel = ins.get_accel().length();
         float ef_accel_z = ahrs.get_accel_ef().z;
         bool throw_detect = (throw_state.stage > Throw_Detecting) || throw_detected();
@@ -213,14 +215,17 @@ bool Copter::throw_detected()
     }
 
     // Check for high speed (>500 cm/s)
-    bool high_speed = inertial_nav.get_velocity().length() > THROW_HIGH_SPEED;
+    Vector3f curr_vel;
+    ahrs.get_velocity_NEU_cm(curr_vel);
+    bool high_speed = curr_vel.length() > THROW_HIGH_SPEED;
 
     // check for upwards or downwards trajectory (airdrop) of 50cm/s
     bool changing_height;
+
     if (g2.throw_type == ThrowType_Drop) {
-        changing_height = inertial_nav.get_velocity().z < -THROW_VERTICAL_SPEED;
+        changing_height = curr_vel.z < -THROW_VERTICAL_SPEED;
     } else {
-        changing_height = inertial_nav.get_velocity().z > THROW_VERTICAL_SPEED;
+        changing_height = curr_vel.z > THROW_VERTICAL_SPEED;
     }
 
     // Check the vertical acceleraton is greater than 0.25g
@@ -235,11 +240,11 @@ bool Copter::throw_detected()
     // Record time and vertical velocity when we detect the possible throw
     if (possible_throw_detected && ((AP_HAL::millis() - throw_state.free_fall_start_ms) > 500)) {
         throw_state.free_fall_start_ms = AP_HAL::millis();
-        throw_state.free_fall_start_velz = inertial_nav.get_velocity().z;
+        throw_state.free_fall_start_velz = curr_vel.z;
     }
 
     // Once a possible throw condition has been detected, we check for 2.5 m/s of downwards velocity change in less than 0.5 seconds to confirm
-    bool throw_condition_confirmed = ((AP_HAL::millis() - throw_state.free_fall_start_ms < 500) && ((inertial_nav.get_velocity().z - throw_state.free_fall_start_velz) < -250.0f));
+    bool throw_condition_confirmed = ((AP_HAL::millis() - throw_state.free_fall_start_ms < 500) && ((curr_vel.z - throw_state.free_fall_start_velz) < -250.0f));
 
     // start motors and enter the control mode if we are in continuous freefall
     if (throw_condition_confirmed) {

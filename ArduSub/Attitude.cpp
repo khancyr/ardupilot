@@ -81,7 +81,8 @@ float Sub::get_roi_yaw()
 
 float Sub::get_look_ahead_yaw()
 {
-    const Vector3f& vel = inertial_nav.get_velocity();
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
     float speed = norm(vel.x,vel.y);
     // Commanded Yaw to automatically look ahead.
     if (position_ok() && (speed > YAW_LOOK_AHEAD_MIN_SPEED)) {

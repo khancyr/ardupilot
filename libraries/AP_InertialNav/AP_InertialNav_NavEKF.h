@@ -34,16 +34,6 @@ public:
     int32_t     get_longitude() const;
 
     /**
-     * get_velocity - returns the current velocity in cm/s
-     *
-     * @return velocity vector:
-     *      		.x : latitude  velocity in cm/s
-     * 				.y : longitude velocity in cm/s
-     * 				.z : vertical  velocity in cm/s
-     */
-    const Vector3f&    get_velocity() const;
-
-    /**
      * get_pos_z_derivative - returns the derivative of the z position in cm/s
     */
     float    get_pos_z_derivative() const;

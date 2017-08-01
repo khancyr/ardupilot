@@ -407,7 +407,8 @@ void AC_PosControl::pos_to_rate_z()
 // calculates desired acceleration and calls accel throttle controller
 void AC_PosControl::rate_to_accel_z()
 {
-    const Vector3f& curr_vel = _ahrs.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     float p;                                // used to capture pid values for logging
 
     // reset last velocity target to current target
@@ -578,7 +579,8 @@ void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
 {
     Vector3f curr_pos;
     _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
-    Vector3f curr_vel = _ahrs.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     float linear_distance;      // the distance at which we swap from a linear to sqrt response
     float linear_velocity;      // the velocity above which we swap from a linear to sqrt response
     float stopping_dist;		// the distance within the vehicle can stop
@@ -718,7 +720,8 @@ void AC_PosControl::init_vel_controller_xyz()
     set_alt_target(curr_pos.z);
 
     // move current vehicle velocity into feed forward velocity
-    const Vector3f& curr_vel = _ahrs.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
     set_desired_velocity(curr_vel);
 
     // initialise ekf reset handlers
@@ -903,8 +906,10 @@ void AC_PosControl::rate_to_accel_xy(float dt, float ekfNavVelGainScaler)
     if (_flags.vehicle_horiz_vel_override) {
         _flags.vehicle_horiz_vel_override = false;
     } else {
-        _vehicle_horiz_vel.x = _ahrs.get_velocity().x;
-        _vehicle_horiz_vel.y = _ahrs.get_velocity().y;
+        Vector3f curr_vel;
+        _ahrs.get_velocity_NEU_cm(curr_vel);
+        _vehicle_horiz_vel.x = curr_vel.x;
+        _vehicle_horiz_vel.y = curr_vel.y;
     }
 
     // feed forward desired acceleration calculation

@@ -65,7 +65,8 @@ void Copter::drift_run()
     pilot_throttle_scaled = get_pilot_desired_throttle(channel_throttle->get_control_in());
 
     // Grab inertial velocity
-    const Vector3f& vel = inertial_nav.get_velocity();
+    Vector3f vel;
+    ahrs.get_velocity_NEU_cm(vel);
 
     // rotate roll, pitch input from north facing to vehicle's perspective
     float roll_vel =  vel.y * ahrs.cos_yaw() - vel.x * ahrs.sin_yaw(); // body roll vel

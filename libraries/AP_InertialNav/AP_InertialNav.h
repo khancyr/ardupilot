@@ -53,16 +53,6 @@ public:
     virtual int32_t     get_longitude() const = 0;
 
     /**
-     * get_velocity - returns the current velocity in cm/s
-     *
-     * @return velocity vector:
-     *      		.x : latitude  velocity in cm/s
-     * 				.y : longitude velocity in cm/s
-     * 				.z : vertical  velocity in cm/s
-     */
-    virtual const Vector3f&    get_velocity() const = 0;
-
-    /**
      * get_velocity_xy - returns the current horizontal velocity in cm/s
      *
      * @returns the current horizontal velocity in cm/s

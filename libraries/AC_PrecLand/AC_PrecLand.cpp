@@ -161,7 +161,9 @@ void AC_PrecLand::update(float rangefinder_alt_cm, bool rangefinder_alt_valid)
     struct inertial_data_frame_s inertial_data_newest;
     _ahrs.getCorrectedDeltaVelocityNED(inertial_data_newest.correctedVehicleDeltaVelocityNED, inertial_data_newest.dt);
     inertial_data_newest.Tbn = _ahrs.get_rotation_body_to_ned();
-    inertial_data_newest.inertialNavVelocity = _inav.get_velocity()*0.01f;
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NEU_cm(curr_vel);
+    inertial_data_newest.inertialNavVelocity = curr_vel * 0.01f;
     nav_filter_status filt_status;
     _ahrs.get_filter_status(filt_status);
     inertial_data_newest.inertialNavVelocityValid = filt_status.flags.horiz_vel;

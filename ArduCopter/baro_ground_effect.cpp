@@ -24,7 +24,8 @@ void Copter::update_ground_effect_detector(void)
     }
 
     if (position_ok() || optflow_position_ok()) {
-        Vector3f vel = inertial_nav.get_velocity();
+        Vector3f vel;
+        ahrs.get_velocity_NEU_cm(vel);
         vel.z = 0.0f;
         xy_speed_cms = vel.length();
     }

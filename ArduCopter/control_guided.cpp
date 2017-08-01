@@ -132,7 +132,8 @@ void Copter::guided_posvel_control_start()
 
     Vector3f curr_pos;
     ahrs.get_relative_position_NEU_origin_cm(curr_pos);
-    const Vector3f& curr_vel = inertial_nav.get_velocity();
+    Vector3f curr_vel;
+    ahrs.get_velocity_NEU_cm(curr_vel);
 
     // set target position and velocity to current position and velocity
     pos_control->set_xy_target(curr_pos.x, curr_pos.y);

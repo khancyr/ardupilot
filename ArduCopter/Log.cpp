@@ -274,7 +274,8 @@ void Copter::Log_Write_Nav_Tuning()
     const Vector3f &accel_target = pos_control->get_accel_target();
     Vector3f position;
     ahrs.get_relative_position_NEU_origin_cm(position);
-    const Vector3f &velocity = inertial_nav.get_velocity();
+    Vector3f velocity;
+    ahrs.get_velocity_NEU_cm(velocity);
 
     struct log_Nav_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_NAV_TUNING_MSG),
