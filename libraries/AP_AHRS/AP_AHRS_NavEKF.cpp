@@ -832,6 +832,14 @@ void AP_AHRS_NavEKF::get_relative_position_NEU_origin_cm(Vector3f &vec) const
     }
 }
 
+// get latest altitude estimate in cm
+float AP_AHRS_NavEKF::get_altitude() const
+{
+    Vector3f vec;
+    get_relative_position_NEU_origin_cm(vec);
+    return vec.z;
+}
+
 // write a relative ground position estimate to the origin in meters, North/East order
 // return true if estimate is valid
 bool AP_AHRS_NavEKF::get_relative_position_NE_origin(Vector2f &posNE) const

@@ -110,7 +110,7 @@ bool AP_Arming_Copter::barometer_checks(bool display_failure)
         _ahrs_navekf.get_filter_status(filt_status);
         bool using_baro_ref = (!filt_status.flags.pred_horiz_pos_rel && filt_status.flags.pred_horiz_pos_abs);
         if (using_baro_ref) {
-            if (fabsf(_inav.get_altitude() - copter.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM) {
+            if (fabsf(_ahrs_navekf.get_altitude() - copter.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM) {
                 if (display_failure) {
                     gcs().send_text(MAV_SEVERITY_CRITICAL,"PreArm: Altitude disparity");
                 }
@@ -694,7 +694,7 @@ bool AP_Arming_Copter::arm_checks(bool display_failure, bool arming_from_gcs)
         nav_filter_status filt_status;
         _ahrs_navekf.get_filter_status(filt_status);
         bool using_baro_ref = (!filt_status.flags.pred_horiz_pos_rel && filt_status.flags.pred_horiz_pos_abs);
-        if (using_baro_ref && (fabsf(_inav.get_altitude() - copter.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM)) {
+        if (using_baro_ref && (fabsf(_ahrs_navekf.get_altitude() - copter.baro_alt) > PREARM_MAX_ALT_DISPARITY_CM)) {
             if (display_failure) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL,"Arm: Altitude disparity");
             }

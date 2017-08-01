@@ -148,7 +148,7 @@ void AC_PosControl::set_alt_target_with_slew(float alt_cm, float dt)
     }
 
     // do not let target get too far from current altitude
-    float curr_alt = _ahrs.get_altitude();
+    const float curr_alt = _ahrs.get_altitude();
     _pos_target.z = constrain_float(_pos_target.z,curr_alt-_leash_down_z,curr_alt+_leash_up_z);
 }
 
@@ -361,7 +361,7 @@ void AC_PosControl::calc_leash_length_z()
 // vel_up_max, vel_down_max should have already been set before calling this method
 void AC_PosControl::pos_to_rate_z()
 {
-    float curr_alt = _ahrs.get_altitude();
+    const float curr_alt = _ahrs.get_altitude();
 
     // clear position limit flags
     _limit.pos_up = false;

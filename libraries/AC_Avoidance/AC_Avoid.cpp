@@ -111,7 +111,7 @@ void AC_Avoid::adjust_velocity_z(float kP, float accel_cmss, float& climb_rate_c
     // calculate distance to optical flow altitude limit
     float ekf_alt_limit_cm;
     if (_inav.get_hgt_ctrl_limit(ekf_alt_limit_cm)) {
-        float ekf_alt_diff_cm = ekf_alt_limit_cm - _inav.get_altitude();
+        const float ekf_alt_diff_cm = ekf_alt_limit_cm - _ahrs.get_altitude();
         if (!limit_alt || ekf_alt_diff_cm < alt_diff_cm) {
             alt_diff_cm = ekf_alt_diff_cm;
         }
@@ -412,7 +412,7 @@ float AC_Avoid::get_alt_above_home() const
     // vehicle's alt above ekf origin + ekf origin's alt above sea level - home's alt above sea level
     Location origin;
     _ahrs.get_origin(origin);
-    return _inav.get_altitude() + origin.alt - _ahrs.get_home().alt;
+    return _ahrs.get_altitude() + origin.alt - _ahrs.get_home().alt;
 }
 
 /*

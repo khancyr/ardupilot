@@ -142,6 +142,7 @@ public:
     bool get_relative_position_NED_home(Vector3f &vec) const override;
     bool get_relative_position_NED_origin(Vector3f &vec) const override;
     void get_relative_position_NEU_origin_cm(Vector3f &vec) const;
+    float get_altitude() const;
 
     // return the relative position NE to either home or origin
     // return true if the estimate is valid

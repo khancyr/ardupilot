@@ -43,12 +43,6 @@ public:
     // Z Axis methods
     //
 
-    /**
-     * get_altitude - get latest altitude estimate in cm above the
-     * reference position
-     * @return
-     */
-    virtual float       get_altitude() const = 0;
 
     /**
      * get_hgt_ctrl_limit - get maximum height to be observed by the control loops in cm and a validity flag

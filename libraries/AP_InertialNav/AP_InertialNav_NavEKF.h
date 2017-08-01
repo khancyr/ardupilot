@@ -28,11 +28,6 @@ public:
     */
     float    get_pos_z_derivative() const;
 
-    /**
-     * get_altitude - get latest altitude estimate in cm
-     * @return
-     */
-    float       get_altitude() const;
 
     /**
      * getHgtAboveGnd - get latest altitude estimate above ground level in centimetres and validity flag

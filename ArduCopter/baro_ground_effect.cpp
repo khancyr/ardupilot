@@ -40,12 +40,12 @@ void Copter::update_ground_effect_detector(void)
     bool throttle_up = mode_has_manual_throttle(control_mode) && channel_throttle->get_control_in() > 0;
     if (!throttle_up && ap.land_complete) {
         gndeffect_state.takeoff_time_ms = tnow_ms;
-        gndeffect_state.takeoff_alt_cm = inertial_nav.get_altitude();
+        gndeffect_state.takeoff_alt_cm = ahrs.get_altitude();
     }
 
     // if we are in takeoff_expected and we meet the conditions for having taken off
     // end the takeoff_expected state
-    if (gndeffect_state.takeoff_expected && (tnow_ms-gndeffect_state.takeoff_time_ms > 5000 || inertial_nav.get_altitude()-gndeffect_state.takeoff_alt_cm > 50.0f)) {
+    if (gndeffect_state.takeoff_expected && (tnow_ms-gndeffect_state.takeoff_time_ms > 5000 || ahrs.get_altitude()-gndeffect_state.takeoff_alt_cm > 50.0f)) {
         gndeffect_state.takeoff_expected = false;
     }
 

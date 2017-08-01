@@ -32,22 +32,6 @@ float AP_InertialNav_NavEKF::get_pos_z_derivative() const
     return _pos_z_rate;
 }
 
-/**
- * get_altitude - get latest altitude estimate in cm
- * @return
- */
-float AP_InertialNav_NavEKF::get_altitude() const
-{
-    // get the NED position relative to the local earth frame origin
-    Vector3f posNED;
-    Vector3f _relpos_cm;   // NEU
-    if (_ahrs_ekf.get_relative_position_NED_origin(posNED)) {
-        _relpos_cm.x = posNED.x * 100.0f; // convert from m to cm
-        _relpos_cm.y = posNED.y * 100.0f; // convert from m to cm
-        _relpos_cm.z = - posNED.z * 100.0f; // convert from m in NED to cm in NEU
-    }
-    return _relpos_cm.z;
-}
 
 /**
  * getHgtAboveGnd - get latest height above ground level estimate in cm and a validity flag

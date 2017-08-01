@@ -19,7 +19,7 @@ void Sub::read_inertia()
         return;
     }
 
-    current_loc.alt = inertial_nav.get_altitude();
+    current_loc.alt = ahrs.get_altitude();
 
     // get velocity, altitude is always absolute frame, referenced from
     // water's surface

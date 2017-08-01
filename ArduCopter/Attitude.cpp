@@ -229,7 +229,7 @@ float Copter::get_surface_tracking_climb_rate(int16_t target_rate, float current
     static uint32_t last_call_ms = 0;
     float distance_error;
     float velocity_correction;
-    float current_alt = inertial_nav.get_altitude();
+    float current_alt = ahrs.get_altitude();
 
     uint32_t now = millis();
 

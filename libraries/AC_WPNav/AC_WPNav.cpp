@@ -1218,7 +1218,7 @@ bool AC_WPNav::get_terrain_offset(float& offset_cm)
     // use range finder if connected
     if (_rangefinder_available && _rangefinder_use) {
         if (_rangefinder_healthy) {
-            offset_cm = _inav.get_altitude() - _rangefinder_alt_cm;
+            offset_cm = _ahrs.get_altitude() - _rangefinder_alt_cm;
             return true;
         } else {
             return false;
@@ -1228,7 +1228,7 @@ bool AC_WPNav::get_terrain_offset(float& offset_cm)
     // use terrain database
     float terr_alt = 0.0f;
     if (_terrain != nullptr && _terrain->height_above_terrain(terr_alt, true)) {
-        offset_cm = _inav.get_altitude() - (terr_alt * 100.0f);
+        offset_cm = _ahrs.get_altitude() - (terr_alt * 100.0f);
         return true;
     }
 #endif
