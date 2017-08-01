@@ -234,7 +234,8 @@ uint8_t AC_Fence::check_fence(float curr_alt)
             load_polygon_from_eeprom();
         } else if (_boundary_valid) {
             // check if vehicle is outside the polygon fence
-            const Vector3f& position = _inav.get_position();
+            Vector3f position;
+            _ahrs.get_relative_position_NEU_origin_cm(position);
             if (_poly_loader.boundary_breached(Vector2f(position.x, position.y), _boundary_num_points, _boundary, true)) {
                 // check if this is a new breach
                 if ((_breached_fences & AC_FENCE_TYPE_POLYGON) == 0) {

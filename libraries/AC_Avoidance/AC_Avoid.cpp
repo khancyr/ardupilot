@@ -320,7 +320,7 @@ void AC_Avoid::adjust_velocity_polygon(float kP, float accel_cmss, Vector2f &des
     // do not adjust velocity if vehicle is outside the polygon fence
     Vector3f position;
     if (earth_frame) {
-        position = _inav.get_position();
+        _ahrs.get_relative_position_NEU_origin_cm(position);
     }
     Vector2f position_xy(position.x, position.y);
     if (_fence.boundary_breached(position_xy, num_points, boundary)) {
@@ -395,7 +395,8 @@ void AC_Avoid::limit_velocity(float kP, float accel_cmss, Vector2f &desired_vel,
  */
 Vector2f AC_Avoid::get_position() const
 {
-    const Vector3f position_xyz = _inav.get_position();
+    Vector3f position_xyz;
+    _ahrs.get_relative_position_NEU_origin_cm(position_xyz);
     const Vector2f position_xy(position_xyz.x,position_xyz.y);
     Location origin;
     _ahrs.get_origin(origin);

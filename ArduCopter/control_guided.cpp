@@ -130,7 +130,8 @@ void Copter::guided_posvel_control_start()
     pos_control->set_accel_xy(wp_nav->get_wp_acceleration());
     pos_control->set_jerk_xy_to_default();
 
-    const Vector3f& curr_pos = inertial_nav.get_position();
+    Vector3f curr_pos;
+    ahrs.get_relative_position_NEU_origin_cm(curr_pos);
     const Vector3f& curr_vel = inertial_nav.get_velocity();
 
     // set target position and velocity to current position and velocity
@@ -517,7 +518,9 @@ void Copter::guided_posvel_control_run()
     // if not auto armed or motors not enabled set throttle to zero and exit immediately
     if (!motors->armed() || !ap.auto_armed || !motors->get_interlock() || ap.land_complete) {
         // set target position and velocity to current position and velocity
-        pos_control->set_pos_target(inertial_nav.get_position());
+        Vector3f curr_pos;
+        ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+        pos_control->set_pos_target(curr_pos);
         pos_control->set_desired_velocity(Vector3f(0,0,0));
 #if FRAME_CONFIG == HELI_FRAME  // Helicopters always stabilize roll/pitch/yaw
         // call attitude controller
@@ -730,7 +733,9 @@ void Copter::guided_limit_init_time_and_pos()
     guided_limit.start_time = AP_HAL::millis();
 
     // initialise start position from current position
-    guided_limit.start_pos = inertial_nav.get_position();
+    Vector3f curr_pos;
+    ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+    guided_limit.start_pos = curr_pos;
 }
 
 // guided_limit_check - returns true if guided mode has breached a limit
@@ -743,7 +748,8 @@ bool Copter::guided_limit_check()
     }
 
     // get current location
-    const Vector3f& curr_pos = inertial_nav.get_position();
+    Vector3f curr_pos;
+    ahrs.get_relative_position_NEU_origin_cm(curr_pos);
 
     // check if we have gone below min alt
     if (!is_zero(guided_limit.alt_min_cm) && (curr_pos.z < guided_limit.alt_min_cm)) {

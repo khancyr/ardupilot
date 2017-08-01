@@ -661,7 +661,8 @@ bool Sub::verify_circle(const AP_Mission::Mission_Command& cmd)
     // check if we've reached the edge
     if (auto_mode == Auto_CircleMoveToEdge) {
         if (wp_nav.reached_wp_destination()) {
-            Vector3f curr_pos = inertial_nav.get_position();
+            Vector3f curr_pos;
+            ahrs.get_relative_position_NEU_origin_cm(curr_pos);
             Vector3f circle_center = pv_location_to_vector(cmd.content.location);
 
             // set target altitude if not provided

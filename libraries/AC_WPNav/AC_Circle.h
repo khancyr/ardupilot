@@ -18,7 +18,7 @@ class AC_Circle
 public:
 
     /// Constructor
-    AC_Circle(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_PosControl& pos_control);
+    AC_Circle(const AP_AHRS_NavEKF& ahrs, const AP_AHRS_View& ahrs_view, AC_PosControl& pos_control);
 
     /// init - initialise circle controller setting center specifically
     ///     caller should set the position controller's x,y and z speeds and accelerations before calling this
@@ -80,9 +80,9 @@ private:
         uint8_t panorama    : 1;    // true if we are doing a panorama
     } _flags;
 
-    // references to inertial nav and ahrs libraries
-    const AP_InertialNav&       _inav;
-    const AP_AHRS_View&         _ahrs;
+    // references to ahrs libraries
+    const AP_AHRS_NavEKF&       _ahrs;
+    const AP_AHRS_View&         _ahrs_view;
     AC_PosControl&              _pos_control;
 
     // parameters

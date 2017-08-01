@@ -837,7 +837,9 @@ bool Copter::verify_payload_place()
         }
         // no break
     case PayloadPlaceStateType_Ascending_Start: {
-        Location_Class target_loc = inertial_nav.get_position();
+        Vector3f position_cm;
+        ahrs.get_relative_position_NEU_origin_cm(position_cm);
+        Location_Class target_loc{position_cm};
         target_loc.alt = nav_payload_place.descend_start_altitude;
         auto_wp_start(target_loc);
         nav_payload_place.state = PayloadPlaceStateType_Ascending;
@@ -914,7 +916,8 @@ bool Copter::verify_circle(const AP_Mission::Mission_Command& cmd)
     // check if we've reached the edge
     if (auto_mode == Auto_CircleMoveToEdge) {
         if (wp_nav->reached_wp_destination()) {
-            Vector3f curr_pos = inertial_nav.get_position();
+            Vector3f curr_pos;
+            ahrs.get_relative_position_NEU_origin_cm(curr_pos);
             Vector3f circle_center = pv_location_to_vector(cmd.content.location);
 
             // set target altitude if not provided

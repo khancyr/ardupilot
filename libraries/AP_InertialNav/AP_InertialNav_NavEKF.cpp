@@ -18,24 +18,6 @@ void AP_InertialNav_NavEKF::update(float dt)
 }
 
 /**
- * get_position - returns the current position relative to the home location in cm.
- *
- * @return
- */
-const Vector3f &AP_InertialNav_NavEKF::get_position(void) const
-{
-    // get the NED position relative to the local earth frame origin
-    Vector3f posNED;
-    Vector3f _relpos_cm;   // NEU
-    if (_ahrs_ekf.get_relative_position_NED_origin(posNED)) {
-        _relpos_cm.x = posNED.x * 100.0f; // convert from m to cm
-        _relpos_cm.y = posNED.y * 100.0f; // convert from m to cm
-        _relpos_cm.z = - posNED.z * 100.0f; // convert from m in NED to cm in NEU
-    }
-    return _relpos_cm;
-}
-
-/**
  * get_latitude - returns the latitude of the current position estimation in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
  */
 int32_t AP_InertialNav_NavEKF::get_latitude() const

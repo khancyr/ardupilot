@@ -12,7 +12,8 @@ void Sub::fence_check()
     uint8_t orig_breaches = fence.get_breaches();
 
     Vector3f home = pv_location_to_vector(ahrs.get_home());
-    Vector3f curr = inertial_nav.get_position();
+    Vector3f curr;
+    ahrs.get_relative_position_NEU_origin_cm(curr);
     int32_t home_distance = pv_get_horizontal_distance_cm(curr, home);
 
     // give fence library our current distance from home in meters

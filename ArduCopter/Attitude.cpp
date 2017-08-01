@@ -80,7 +80,9 @@ float Copter::get_roi_yaw()
     roi_yaw_counter++;
     if (roi_yaw_counter >= 4) {
         roi_yaw_counter = 0;
-        yaw_look_at_WP_bearing = pv_get_bearing_cd(inertial_nav.get_position(), roi_WP);
+        Vector3f position_cm;
+        ahrs.get_relative_position_NEU_origin_cm(position_cm);
+        yaw_look_at_WP_bearing = pv_get_bearing_cd(position_cm, roi_WP);
     }
 
     return yaw_look_at_WP_bearing;

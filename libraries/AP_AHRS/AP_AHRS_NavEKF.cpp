@@ -805,6 +805,17 @@ bool AP_AHRS_NavEKF::get_relative_position_NED_home(Vector3f &vec) const
     return true;
 }
 
+// get the NED position relative to the local earth frame origin in cm
+void AP_AHRS_NavEKF::get_relative_position_NEU_origin_cm(Vector3f &vec) const
+{
+    if (!get_relative_position_NED_origin(vec)) {
+        return;
+    }
+    vec.x = vec.x * 100.0f;    // convert from m to cm
+    vec.y = vec.y * 100.0f;    // convert from m to cm
+    vec.z = - vec.z * 100.0f;  // convert from m in NED to cm in NEU
+}
+
 // write a relative ground position estimate to the origin in meters, North/East order
 // return true if estimate is valid
 bool AP_AHRS_NavEKF::get_relative_position_NE_origin(Vector2f &posNE) const

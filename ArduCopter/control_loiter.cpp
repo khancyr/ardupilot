@@ -59,8 +59,11 @@ void Copter::precision_loiter_xy()
     wp_nav->clear_pilot_desired_acceleration();
     Vector2f target_pos, target_vel_rel;
     if (!precland.get_target_position_cm(target_pos)) {
-        target_pos.x = inertial_nav.get_position().x;
-        target_pos.y = inertial_nav.get_position().y;
+        Vector3f curr_pos;
+        ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+        target_pos.x = curr_pos.x;
+        target_pos.y = curr_pos.y;
+
     }
     if (!precland.get_target_velocity_relative_cms(target_vel_rel)) {
         target_vel_rel.x = -inertial_nav.get_velocity().x;

@@ -23,15 +23,6 @@ public:
     void        update(float dt);
 
     /**
-     * get_position - returns the current position relative to the home location in cm.
-     *
-     * the home location was set with AP_InertialNav::set_home_position(int32_t, int32_t)
-     *
-     * @return
-     */
-    const Vector3f&    get_position() const;
-
-    /**
      * get_latitude - returns the latitude of the current position estimation in 100 nano degrees (i.e. degree value multiplied by 10,000,000)
      */
     int32_t     get_latitude() const;

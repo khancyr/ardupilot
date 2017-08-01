@@ -110,9 +110,9 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
 // Note that the Vector/Matrix constructors already implicitly zero
 // their values.
 //
-AC_WPNav::AC_WPNav(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_PosControl& pos_control, const AC_AttitudeControl& attitude_control) :
-    _inav(inav),
+AC_WPNav::AC_WPNav(const AP_AHRS_NavEKF& ahrs, const AP_AHRS_View& ahrs_view, AC_PosControl& pos_control, const AC_AttitudeControl& attitude_control) :
     _ahrs(ahrs),
+    _ahrs_view(ahrs_view),
     _pos_control(pos_control),
     _attitude_control(attitude_control),
     _pilot_accel_fwd_cms(0),
@@ -180,7 +180,8 @@ void AC_WPNav::init_loiter_target(const Vector3f& position, bool reset_I)
 /// init_loiter_target - initialize's loiter position and feed-forward velocity from current pos and velocity
 void AC_WPNav::init_loiter_target()
 {
-    const Vector3f& curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
     const Vector3f& curr_vel = _inav.get_velocity();
 
     // initialise position controller
@@ -212,7 +213,8 @@ void AC_WPNav::init_loiter_target()
 /// loiter_soften_for_landing - reduce response for landing
 void AC_WPNav::loiter_soften_for_landing()
 {
-    const Vector3f& curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
 
     // set target position to current position
     _pos_control.set_xy_target(curr_pos.x, curr_pos.y);
@@ -253,8 +255,8 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt, float ekfGndSpdLimit)
 
     // rotate pilot input to lat/lon frame
     Vector2f desired_accel;
-    desired_accel.x = (_pilot_accel_fwd_cms*_ahrs.cos_yaw() - _pilot_accel_rgt_cms*_ahrs.sin_yaw());
-    desired_accel.y = (_pilot_accel_fwd_cms*_ahrs.sin_yaw() + _pilot_accel_rgt_cms*_ahrs.cos_yaw());
+    desired_accel.x = (_pilot_accel_fwd_cms*_ahrs_view.cos_yaw() - _pilot_accel_rgt_cms*_ahrs_view.sin_yaw());
+    desired_accel.y = (_pilot_accel_fwd_cms*_ahrs_view.sin_yaw() + _pilot_accel_rgt_cms*_ahrs_view.cos_yaw());
 
     // calculate the difference
     Vector2f des_accel_diff = (desired_accel - _loiter_desired_accel);
@@ -312,7 +314,9 @@ void AC_WPNav::calc_loiter_desired_velocity(float nav_dt, float ekfGndSpdLimit)
 /// get_bearing_to_target - get bearing to loiter target in centi-degrees
 int32_t AC_WPNav::get_loiter_bearing_to_target() const
 {
-    return get_bearing_cd(_inav.get_position(), _pos_control.get_pos_target());
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+    return get_bearing_cd(curr_pos, _pos_control.get_pos_target());
 }
 
 // update_loiter - run the loiter controller - gets called at 100hz (APM) or 400hz (PX4)
@@ -535,7 +539,8 @@ void AC_WPNav::shift_wp_origin_to_current_pos()
     }
 
     // get current and target locations
-    const Vector3f curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
     const Vector3f pos_target = _pos_control.get_pos_target();
 
     // calculate difference between current position and target
@@ -574,7 +579,8 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     bool reached_leash_limit = false;   // true when track has reached leash limit and we need to slow down the target point
 
     // get current location
-    Vector3f curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
 
     // calculate terrain adjustments
     float terr_offset = 0.0f;
@@ -723,14 +729,17 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
 float AC_WPNav::get_wp_distance_to_destination() const
 {
     // get current location
-    Vector3f curr = _inav.get_position();
-    return norm(_destination.x-curr.x,_destination.y-curr.y);
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+    return norm(_destination.x - curr_pos.x, _destination.y - curr_pos.y);
 }
 
 /// get_wp_bearing_to_destination - get bearing to next waypoint in centi-degrees
 int32_t AC_WPNav::get_wp_bearing_to_destination() const
 {
-    return get_bearing_cd(_inav.get_position(), _destination);
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+    return get_bearing_cd(curr_pos, _destination);
 }
 
 /// update_wpnav - run the wp controller - should be called at 100hz or higher
@@ -1090,7 +1099,8 @@ bool AC_WPNav::advance_spline_target_along_track(float dt)
         calculate_wp_leash_length();
 
         // get current location
-        Vector3f curr_pos = _inav.get_position();
+        Vector3f curr_pos;
+        _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
 
         // get terrain altitude offset for origin and current position (i.e. change in terrain altitude from a position vs ekf origin)
         float terr_offset = 0.0f;

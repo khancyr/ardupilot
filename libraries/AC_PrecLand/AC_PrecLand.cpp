@@ -185,8 +185,10 @@ bool AC_PrecLand::get_target_position_cm(Vector2f& ret)
     if (!target_acquired()) {
         return false;
     }
-    ret.x = _target_pos_rel_out_NE.x*100.0f + _inav.get_position().x;
-    ret.y = _target_pos_rel_out_NE.y*100.0f + _inav.get_position().y;
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NEU_origin_cm(curr_pos);
+    ret.x = _target_pos_rel_out_NE.x * 100.0f + curr_pos.x;
+    ret.y = _target_pos_rel_out_NE.y * 100.0f + curr_pos.y;
     return true;
 }
 

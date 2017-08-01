@@ -563,7 +563,7 @@ bool QuadPlane::setup(void)
         goto failed;
     }
     AP_Param::load_object_from_eeprom(attitude_control, attitude_control->var_info);
-    pos_control = new AC_PosControl(*ahrs_view, inertial_nav, *motors, *attitude_control,
+    pos_control = new AC_PosControl(*ahrs_view, *ahrs, *motors, *attitude_control,
                                     p_alt_hold, p_vel_z, pid_accel_z,
                                     p_pos_xy, pi_vel_xy);
     if (!pos_control) {
@@ -571,7 +571,7 @@ bool QuadPlane::setup(void)
         goto failed;
     }
     AP_Param::load_object_from_eeprom(pos_control, pos_control->var_info);
-    wp_nav = new AC_WPNav(inertial_nav, *ahrs_view, *pos_control, *attitude_control);
+    wp_nav = new AC_WPNav(ahrs, *ahrs_view, *pos_control, *attitude_control);
     if (!wp_nav) {
         hal.console->printf("%s wp_nav\n", strUnableToAllocate);
         goto failed;
@@ -1705,7 +1705,8 @@ void QuadPlane::vtol_position_controller(void)
         
         pos_control->update_vel_controller_xyz(ekfNavVelGainScaler);
 
-        const Vector3f& curr_pos = inertial_nav.get_position();
+        Vector3f curr_pos;
+        ahrs.get_relative_position_NEU_origin_cm(curr_pos);
         pos_control->set_xy_target(curr_pos.x, curr_pos.y);
 
         pos_control->freeze_ff_xy();
