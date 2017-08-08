@@ -52,8 +52,8 @@ void Copter::ModeLoiter::precision_loiter_xy()
         target_pos.y = copter.current_pos.y;
     }
     if (!copter.precland.get_target_velocity_relative_cms(target_vel_rel)) {
-        target_vel_rel.x = -inertial_nav.get_velocity().x;
-        target_vel_rel.y = -inertial_nav.get_velocity().y;
+        target_vel_rel.x = -copter.current_vel.x;
+        target_vel_rel.y = -copter.current_vel.y;
     }
     pos_control->set_xy_target(target_pos.x, target_pos.y);
     pos_control->override_vehicle_velocity_xy(-target_vel_rel);
