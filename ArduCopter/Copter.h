@@ -558,7 +558,7 @@ private:
 
     // Crop Sprayer
 #if SPRAYER == ENABLED
-    AC_Sprayer sprayer{&inertial_nav};
+    AC_Sprayer sprayer{&ahrs};
 #endif
 
     // Parachute release
@@ -576,7 +576,7 @@ private:
 
     // Precision Landing
 #if PRECISION_LANDING == ENABLED
-    AC_PrecLand precland{ahrs, inertial_nav};
+    AC_PrecLand precland{ahrs};
 #endif
 
     // Pilot Input Management Library
