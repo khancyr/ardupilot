@@ -74,9 +74,9 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
 // Note that the Vector/Matrix constructors already implicitly zero
 // their values.
 //
-AC_WPNav::AC_WPNav(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_PosControl& pos_control, const AC_AttitudeControl& attitude_control) :
-    _inav(inav),
+AC_WPNav::AC_WPNav(AP_AHRS_NavEKF& ahrs, const AP_AHRS_View& ahrs_view, AC_PosControl& pos_control, const AC_AttitudeControl& attitude_control) :
     _ahrs(ahrs),
+    _ahrs_view(ahrs_view),
     _pos_control(pos_control),
     _attitude_control(attitude_control),
     _wp_last_update(0),
@@ -113,7 +113,7 @@ AC_WPNav::AC_WPNav(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_PosC
 /// init_brake_target - initializes stop position from current position and velocity
 void AC_WPNav::init_brake_target(float accel_cmss)
 {
-    const Vector3f& curr_vel = _inav.get_velocity();
+    Vector2f curr_vel = _ahrs.groundspeed_vector() * 100.0f;  // m/s to cm/s
     Vector3f stopping_point;
 
     // initialise position controller
@@ -282,7 +282,10 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     _flags.wp_yaw_set = false;
 
     // initialise the limited speed to current speed along the track
-    const Vector3f &curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NED(curr_vel);
+    curr_vel = curr_vel * 100.0f;  // m/s to cm/s
+    curr_vel.z = -curr_vel.z;  // NED to NEU
     // get speed along track (note: we convert vertical speed into horizontal speed equivalent)
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
     _limited_speed_xy_cms = constrain_float(speed_along_track,0,_wp_speed_cms);
@@ -301,7 +304,10 @@ void AC_WPNav::shift_wp_origin_to_current_pos()
     }
 
     // get current and target locations
-    const Vector3f curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NED_origin(curr_pos);
+    curr_pos = curr_pos * 100.0f;  // m to cm
+    curr_pos.z = -curr_pos.z;  // NED to NEU
     const Vector3f pos_target = _pos_control.get_pos_target();
 
     // calculate difference between current position and target
@@ -339,7 +345,10 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     bool reached_leash_limit = false;   // true when track has reached leash limit and we need to slow down the target point
 
     // get current location
-    Vector3f curr_pos = _inav.get_position();
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NED_origin(curr_pos);
+    curr_pos = curr_pos * 100.0f;  // m to cm
+    curr_pos.z = -curr_pos.z;  // NED to NEU
 
     // calculate terrain adjustments
     float terr_offset = 0.0f;
@@ -383,7 +392,10 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     }
 
     // get current velocity
-    const Vector3f &curr_vel = _inav.get_velocity();
+    Vector3f curr_vel;
+    _ahrs.get_velocity_NED(curr_vel);
+    curr_vel = curr_vel * 100.0f;  // m/s to cm/s
+    curr_vel.z = -curr_vel.z;  // NED to NEU
     // get speed along track
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
 
@@ -488,14 +500,20 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
 float AC_WPNav::get_wp_distance_to_destination() const
 {
     // get current location
-    Vector3f curr = _inav.get_position();
-    return norm(_destination.x-curr.x,_destination.y-curr.y);
+    Vector2f curr_pos;
+    _ahrs.get_relative_position_NE_origin(curr_pos);
+    curr_pos = curr_pos * 100.0f;  // m to cm
+    return norm(_destination.x - curr_pos.x, _destination.y - curr_pos.y);
 }
 
 /// get_wp_bearing_to_destination - get bearing to next waypoint in centi-degrees
 int32_t AC_WPNav::get_wp_bearing_to_destination() const
 {
-    return get_bearing_cd(_inav.get_position(), _destination);
+    Vector3f curr_pos;
+    _ahrs.get_relative_position_NED_origin(curr_pos);
+    curr_pos = curr_pos * 100.0f;  // m to cm
+    curr_pos.z = -curr_pos.z;  // NED to NEU
+    return get_bearing_cd(curr_pos, _destination);
 }
 
 /// update_wpnav - run the wp controller - should be called at 100hz or higher
@@ -856,7 +874,10 @@ bool AC_WPNav::advance_spline_target_along_track(float dt)
         calculate_wp_leash_length();
 
         // get current location
-        Vector3f curr_pos = _inav.get_position();
+        Vector3f curr_pos;
+        _ahrs.get_relative_position_NED_origin(curr_pos);
+        curr_pos = curr_pos * 100.0f;  // m to cm
+        curr_pos.z = -curr_pos.z;  // NED to NEU
 
         // get terrain altitude offset for origin and current position (i.e. change in terrain altitude from a position vs ekf origin)
         float terr_offset = 0.0f;
@@ -967,7 +988,10 @@ bool AC_WPNav::get_terrain_offset(float& offset_cm)
     // use range finder if connected
     if (_rangefinder_available && _rangefinder_use) {
         if (_rangefinder_healthy) {
-            offset_cm = _inav.get_altitude() - _rangefinder_alt_cm;
+            float curr_alt{};
+            _ahrs.get_relative_position_D_origin(curr_alt);
+            curr_alt = curr_alt * -100.0f;
+            offset_cm = curr_alt - _rangefinder_alt_cm;
             return true;
         } else {
             return false;
@@ -977,7 +1001,10 @@ bool AC_WPNav::get_terrain_offset(float& offset_cm)
     // use terrain database
     float terr_alt = 0.0f;
     if (_terrain != nullptr && _terrain->height_above_terrain(terr_alt, true)) {
-        offset_cm = _inav.get_altitude() - (terr_alt * 100.0f);
+        float curr_alt{};
+        _ahrs.get_relative_position_D_origin(curr_alt);
+        curr_alt = curr_alt * -100.0f;
+        offset_cm = curr_alt - (terr_alt * 100.0f);
         return true;
     }
 #endif
