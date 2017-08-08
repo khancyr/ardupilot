@@ -45,7 +45,6 @@ Sub::Sub(void)
           condition_value(0),
           condition_start(0),
           G_Dt(MAIN_LOOP_SECONDS),
-          inertial_nav(ahrs),
           ahrs_view(ahrs, ROTATION_NONE),
           attitude_control(ahrs_view, aparm, motors, MAIN_LOOP_SECONDS),
           pos_control(ahrs, ahrs_view, motors, attitude_control),
