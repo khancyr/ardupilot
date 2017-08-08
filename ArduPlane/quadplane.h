@@ -1,7 +1,6 @@
 #include <AP_Motors/AP_Motors.h>
 #include <AC_PID/AC_PID.h>
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi.h> // Attitude control library
-#include <AP_InertialNav/AP_InertialNav.h>
 #include <AC_AttitudeControl/AC_PosControl.h>
 #include <AC_WPNav/AC_WPNav.h>
 #include <AC_WPNav/AC_Loiter.h>
@@ -129,8 +128,6 @@ public:
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
-
-    AP_InertialNav_NavEKF inertial_nav{ahrs};
 
     AP_Int8 frame_class;
     AP_Int8 frame_type;
