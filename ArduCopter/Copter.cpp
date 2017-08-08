@@ -33,7 +33,6 @@ Copter::Copter(void)
     land_accel_ef_filter(LAND_DETECTOR_ACCEL_LPF_CUTOFF),
     rc_throttle_control_in_filter(1.0f),
     auto_yaw_mode(AUTO_YAW_LOOK_AT_NEXT_WP),
-    inertial_nav(ahrs),
     param_loader(var_info),
     flightmode(&mode_stabilize)
 {

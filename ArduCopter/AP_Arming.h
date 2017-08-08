@@ -5,12 +5,12 @@
 class AP_Arming_Copter : public AP_Arming
 {
 public:
+<<<<<<< HEAD
     friend class Copter;
     friend class ToyMode;
     AP_Arming_Copter(const AP_AHRS_NavEKF &ahrs_ref, Compass &compass,
-                     const AP_BattMonitor &battery, const AP_InertialNav_NavEKF &inav)
+                     const AP_BattMonitor &battery)
         : AP_Arming(ahrs_ref, compass, battery)
-        , _inav(inav)
         , _ahrs_navekf(ahrs_ref)
     {
     }
@@ -49,7 +49,6 @@ protected:
 
 private:
 
-    const AP_InertialNav_NavEKF &_inav;
     const AP_AHRS_NavEKF &_ahrs_navekf;
 
     void parameter_checks_pid_warning_message(bool display_failure, const char *error_msg);
