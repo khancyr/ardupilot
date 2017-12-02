@@ -61,8 +61,8 @@ bool Copter::set_home(const Location& loc, bool lock)
     }
 
     // check EKF origin has been set
-    Location ekf_origin;
-    if (!ahrs.get_origin(ekf_origin)) {
+    Location origin;
+    if (!ahrs.get_origin(origin)) {
         return false;
     }
 
@@ -119,8 +119,8 @@ void Copter::set_ekf_origin(const Location& loc)
     }
 
     // check EKF origin has already been set
-    Location ekf_origin;
-    if (ahrs.get_origin(ekf_origin)) {
+    Location origin;
+    if (ahrs.get_origin(origin)) {
         return;
     }
 
