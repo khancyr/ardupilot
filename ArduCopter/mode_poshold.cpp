@@ -409,7 +409,7 @@ void Copter::ModePosHold::run()
             poshold.pitch_mode = POSHOLD_BRAKE_TO_LOITER;
             poshold.brake_to_loiter_timer = POSHOLD_BRAKE_TO_LOITER_TIMER;
             // init loiter controller
-            loiter_nav->init_target(inertial_nav.get_position());
+            loiter_nav->init_target(_copter.current_pos);
             // set delay to start of wind compensation estimate updates
             poshold.wind_comp_start_timer = POSHOLD_WIND_COMP_START_TIMER;
         }
