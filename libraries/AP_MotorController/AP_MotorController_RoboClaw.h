@@ -29,7 +29,7 @@ class AP_MotorController_RoboClaw : public AP_MotorController_Backend {
   public:
 
     // constructor
-    AP_MotorController_RoboClaw(AP_MotorController &frontend, AP_SerialManager &serial_manager);
+    AP_MotorController_RoboClaw(AP_MotorController &frontend, AP_SerialManager *serial_manager);
 
     // update
     void update(uint32_t motor1, uint32_t motor2) override;
@@ -42,7 +42,7 @@ class AP_MotorController_RoboClaw : public AP_MotorController_Backend {
 
     class RoboClaw {
         uint16_t crc;
-        uint32_t timeout;
+        uint32_t _timeout;
 
         AP_HAL::UARTDriver *hserial;
         enum {
@@ -141,7 +141,7 @@ class AP_MotorController_RoboClaw : public AP_MotorController_Backend {
         };    //Only available via USB communications
       public:
         static constexpr uint8_t ROBOCLAW_ADDR = 0x80;
-
+        RoboClaw();
         // public methods
         RoboClaw(AP_HAL::UARTDriver *uart, uint32_t tout);
 

@@ -23,12 +23,12 @@
 
 extern const AP_HAL::HAL &hal;
 
-AP_MotorController_RoboClaw::AP_MotorController_RoboClaw(AP_MotorController &frontend, AP_SerialManager &serial_manager)
+AP_MotorController_RoboClaw::AP_MotorController_RoboClaw(AP_MotorController &frontend, AP_SerialManager *serial_manager)
     :
     AP_MotorController_Backend(frontend) {
-    uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_MotorController, 0);
+    uart = serial_manager->find_serial(AP_SerialManager::SerialProtocol_ESCTelemetry, 0);
     if (uart != nullptr) {
-        uart->begin(serial_manager.find_baudrate(AP_SerialManager::SerialProtocol_MotorController, 0));
+        uart->begin(serial_manager->find_baudrate(AP_SerialManager::SerialProtocol_ESCTelemetry, 0));
         robotclaw = RoboClaw(uart, 10000);
     }
 }
@@ -71,9 +71,8 @@ void AP_MotorController_RoboClaw::update(uint32_t motor1, uint32_t motor2) {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////
-// Create and initialize MarvelmindHedge structure
-//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
 #define MAXRETRY 2
 #define SetDWORDval(arg) (uint8_t)(((uint32_t)arg)>>24),(uint8_t)(((uint32_t)arg)>>16),(uint8_t)(((uint32_t)arg)>>8),(uint8_t)arg
 #define SetWORDval(arg) (uint8_t)(((uint16_t)arg)>>8),(uint8_t)arg
@@ -81,8 +80,12 @@ void AP_MotorController_RoboClaw::update(uint32_t motor1, uint32_t motor2) {
 //
 // Constructor
 //
+AP_MotorController_RoboClaw::RoboClaw::RoboClaw()
+{
+}
+
 AP_MotorController_RoboClaw::RoboClaw::RoboClaw(AP_HAL::UARTDriver *uart, uint32_t tout) :
-    timeout(tout),
+    _timeout(tout),
     hserial(uart) {
 }
 
@@ -95,18 +98,21 @@ size_t AP_MotorController_RoboClaw::RoboClaw::write(uint8_t byte) {
     if (hserial) {
         return hserial->write(byte);
     }
+    return 0;
 }
 
 int16_t AP_MotorController_RoboClaw::RoboClaw::read() {
     if (hserial) {
         return hserial->read();
     }
+    return 0;
 }
 
 uint32_t AP_MotorController_RoboClaw::RoboClaw::available() {
     if (hserial) {
         return hserial->available();
     }
+    return 0;
 }
 
 void AP_MotorController_RoboClaw::RoboClaw::flush() {
@@ -126,6 +132,7 @@ int16_t AP_MotorController_RoboClaw::RoboClaw::read(uint32_t timeout) {
         }
         return hserial->read();
     }
+    return 0;
 }
 
 void AP_MotorController_RoboClaw::RoboClaw::clear() {
@@ -168,10 +175,10 @@ bool AP_MotorController_RoboClaw::RoboClaw::write_n(uint8_t cnt, ...) {
             write(data);
         }
         va_end(marker);              /* Reset variable arguments.      */
-        uint16_t crc = crc_get();
-        write(crc >> 8);
-        write(crc);
-        if (read(timeout) == 0xFF) {
+        uint16_t lcrc = crc_get();
+        write(lcrc >> 8);
+        write(lcrc);
+        if (read(_timeout) == 0xFF) {
             return true;
         }
     } while (trys--);
@@ -199,7 +206,7 @@ bool AP_MotorController_RoboClaw::RoboClaw::read_n(uint8_t cnt, uint8_t address,
             uint32_t *ptr = va_arg(marker, uint32_t *);
 
             if (data != -1) {
-                data = read(timeout);
+                data = read(_timeout);
                 crc_update(data);
                 value = (uint32_t) data << 24;
             } else {
@@ -207,7 +214,7 @@ bool AP_MotorController_RoboClaw::RoboClaw::read_n(uint8_t cnt, uint8_t address,
             }
 
             if (data != -1) {
-                data = read(timeout);
+                data = read(_timeout);
                 crc_update(data);
                 value |= (uint32_t) data << 16;
             } else {
@@ -215,7 +222,7 @@ bool AP_MotorController_RoboClaw::RoboClaw::read_n(uint8_t cnt, uint8_t address,
             }
 
             if (data != -1) {
-                data = read(timeout);
+                data = read(_timeout);
                 crc_update(data);
                 value |= (uint32_t) data << 8;
             } else {
@@ -223,7 +230,7 @@ bool AP_MotorController_RoboClaw::RoboClaw::read_n(uint8_t cnt, uint8_t address,
             }
 
             if (data != -1) {
-                data = read(timeout);
+                data = read(_timeout);
                 crc_update(data);
                 value |= (uint32_t) data;
             } else {
@@ -236,10 +243,10 @@ bool AP_MotorController_RoboClaw::RoboClaw::read_n(uint8_t cnt, uint8_t address,
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     return crc_get() == ccrc;
@@ -267,16 +274,16 @@ uint8_t AP_MotorController_RoboClaw::RoboClaw::Read1(uint8_t address, uint8_t cm
         write(cmd);
         crc_update(cmd);
 
-        data = read(timeout);
+        data = read(_timeout);
         crc_update(data);
         value = data;
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     if (crc_get() == ccrc) {
@@ -307,22 +314,22 @@ uint16_t AP_MotorController_RoboClaw::RoboClaw::Read2(uint8_t address, uint8_t c
         write(cmd);
         crc_update(cmd);
 
-        data = read(timeout);
+        data = read(_timeout);
         crc_update(data);
         value = (uint16_t) data << 8;
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint16_t) data;
         }
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     if (crc_get() == ccrc) {
@@ -353,34 +360,34 @@ uint32_t AP_MotorController_RoboClaw::RoboClaw::Read4(uint8_t address, uint8_t c
         write(cmd);
         crc_update(cmd);
 
-        data = read(timeout);
+        data = read(_timeout);
         crc_update(data);
         value = (uint32_t) data << 24;
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data << 16;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data << 8;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data;
         }
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     if (crc_get() == ccrc) {
@@ -411,30 +418,30 @@ uint32_t AP_MotorController_RoboClaw::RoboClaw::Read4_1(uint8_t address, uint8_t
         write(cmd);
         crc_update(cmd);
 
-        data = read(timeout);
+        data = read(_timeout);
         crc_update(data);
         value = (uint32_t) data << 24;
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data << 16;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data << 8;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             value |= (uint32_t) data;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             if (status)
                 *status = data;
@@ -442,10 +449,10 @@ uint32_t AP_MotorController_RoboClaw::RoboClaw::Read4_1(uint8_t address, uint8_t
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     if (crc_get() == ccrc) {
@@ -537,7 +544,7 @@ bool AP_MotorController_RoboClaw::RoboClaw::ResetEncoders(uint8_t address) {
 }
 
 bool AP_MotorController_RoboClaw::RoboClaw::ReadVersion(uint8_t address, char *version) {
-    uint8_t data;
+    int16_t data;
     uint8_t trys = MAXRETRY;
     do {
         flush();
@@ -552,16 +559,16 @@ bool AP_MotorController_RoboClaw::RoboClaw::ReadVersion(uint8_t address, char *v
 
         uint8_t i;
         for (i = 0; i < 48; i++) {
+            data = read(_timeout);
             if (data != -1) {
-                data = read(timeout);
                 version[i] = data;
                 crc_update(version[i]);
                 if (version[i] == 0) {
                     uint16_t ccrc;
-                    data = read(timeout);
+                    data = read(_timeout);
                     if (data != -1) {
                         ccrc = data << 8;
-                        data = read(timeout);
+                        data = read(_timeout);
                         if (data != -1) {
                             ccrc |= data;
                             return crc_get() == ccrc;
@@ -1039,28 +1046,28 @@ bool AP_MotorController_RoboClaw::RoboClaw::GetPinFunctions(uint8_t address,
         write(GETPINFUNCTIONS);
         crc_update(GETPINFUNCTIONS);
 
-        data = read(timeout);
+        data = read(_timeout);
         crc_update(data);
         val1 = data;
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             val2 = data;
         }
 
         if (data != -1) {
-            data = read(timeout);
+            data = read(_timeout);
             crc_update(data);
             val3 = data;
         }
 
         if (data != -1) {
             uint16_t ccrc;
-            data = read(timeout);
+            data = read(_timeout);
             if (data != -1) {
                 ccrc = data << 8;
-                data = read(timeout);
+                data = read(_timeout);
                 if (data != -1) {
                     ccrc |= data;
                     if (crc_get() == ccrc) {

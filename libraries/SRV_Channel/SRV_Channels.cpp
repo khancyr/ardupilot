@@ -28,6 +28,7 @@ SRV_Channel *SRV_Channels::channels;
 SRV_Channels *SRV_Channels::instance;
 AP_Volz_Protocol *SRV_Channels::volz_ptr;
 AP_SBusOut *SRV_Channels::sbus_ptr;
+AP_MotorController *SRV_Channels::motorcontroller_ptr;
 
 #if HAL_SUPPORT_RCOUT_SERIAL
 AP_BLHeli *SRV_Channels::blheli_ptr;
@@ -128,6 +129,10 @@ const AP_Param::GroupInfo SRV_Channels::var_info[] = {
     // @Path: ../AP_SBusOut/AP_SBusOut.cpp
     AP_SUBGROUPINFO(sbus, "_SBUS_",  20, SRV_Channels, AP_SBusOut),
 
+    // @Group: _MCR_
+    // @Path: ../AP_MotorController/AP_MotorController.cpp
+    AP_SUBGROUPINFO(motorcontroller, "_MCR_",  21, SRV_Channels, AP_MotorController),
+
 #if HAL_SUPPORT_RCOUT_SERIAL
     // @Group: _BLH_
     // @Path: ../AP_BLHeli/AP_BLHeli.cpp
@@ -155,6 +160,8 @@ SRV_Channels::SRV_Channels(void)
 
     volz_ptr = &volz;
     sbus_ptr = &sbus;
+    motorcontroller.init();
+    motorcontroller_ptr = &motorcontroller;
 #if HAL_SUPPORT_RCOUT_SERIAL
     blheli_ptr = &blheli;
 #endif
@@ -226,6 +233,8 @@ void SRV_Channels::push()
     // give sbus library a chance to update
     sbus_ptr->update();
 
+    // give volz library a chance to update
+    motorcontroller_ptr->update(SRV_Channels::srv_channel(1)->get_output_pwm(), SRV_Channels::srv_channel(3)->get_output_pwm());
 #if HAL_SUPPORT_RCOUT_SERIAL
     // give blheli telemetry a chance to update
     blheli_ptr->update_telemetry();

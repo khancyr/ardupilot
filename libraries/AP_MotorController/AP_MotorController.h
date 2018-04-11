@@ -26,7 +26,7 @@ class AP_MotorController {
   public:
     friend class AP_MotorController_Backend;
 
-    AP_MotorController(AP_SerialManager &_serial_manager);
+    AP_MotorController();
 
     // external position backend types (used by _TYPE parameter)
     enum MotorController_Type {
@@ -58,5 +58,5 @@ class AP_MotorController {
 
     // external references
     AP_MotorController_Backend *_driver;
-    AP_SerialManager &serial_manager;
+    AP_SerialManager *_serial_manager;
 };

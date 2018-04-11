@@ -40,13 +40,15 @@ const AP_Param::GroupInfo AP_MotorController::var_info[] = {
     AP_GROUPEND
 };
 
-AP_MotorController::AP_MotorController(AP_SerialManager &_serial_manager) :
-    serial_manager(_serial_manager) {
+AP_MotorController::AP_MotorController()
+{
     AP_Param::setup_object_defaults(this, var_info);
 }
 
 // initialise the AP_MotorController class
 void AP_MotorController::init(void) {
+
+    _serial_manager = AP_SerialManager::get_instance();
     if (_driver != nullptr) {
         // init called a 2nd time?
         return;
@@ -55,7 +57,7 @@ void AP_MotorController::init(void) {
     // create backend
     switch (_type) {
         case MotorController_TYPE_ROBOCLAW: {
-            _driver = new AP_MotorController_RoboClaw(*this, serial_manager);
+            _driver = new AP_MotorController_RoboClaw(*this, _serial_manager);
             break;
         }
         case MotorController_TYPE_NONE:
