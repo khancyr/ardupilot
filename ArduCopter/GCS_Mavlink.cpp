@@ -563,7 +563,10 @@ void GCS_MAVLINK_Copter::packetReceived(const mavlink_status_t &status,
 #endif
 #if MODE_FOLLOW_ENABLED == ENABLED
     // pass message to follow library
-    copter.g2.follow.handle_msg(msg);
+    if (chan == MAVLINK_COMM_2) {
+        copter.g2.follow.handle_msg(msg);
+        return;
+    }
 #endif
     GCS_MAVLINK::packetReceived(status, msg);
 }

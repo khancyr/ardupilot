@@ -127,7 +127,6 @@ AP_Follow::AP_Follow() :
         _p_pos(AP_FOLLOW_POS_P_DEFAULT)
 {
     AP_Param::setup_object_defaults(this, var_info);
-    _sysid_to_follow = _sysid;
 }
 
 // get target's estimated location
@@ -236,7 +235,7 @@ void AP_Follow::handle_msg(const mavlink_message_t &msg)
     if (msg.sysid == mavlink_system.sysid) {
         return;
     }
-
+    _sysid_to_follow = _sysid;
     // skip message if not from our target
     if ((_sysid_to_follow != 0) && (msg.sysid != _sysid_to_follow)) {
         if (_sysid == 0) {
