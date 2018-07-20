@@ -33,7 +33,20 @@
 #include <AP_Param/AP_Param.h>
 
 using namespace SITL;
-
+// table of user settable parameters
+const AP_Param::GroupInfo Aircraft::var_info[] = {
+        AP_GROUPINFO("_PLOP",    1, Aircraft, plop, 0),
+        // @Group: SPR_
+        // @Path: ./SIM_Sprayer.cpp
+        AP_SUBGROUPINFO(sprayer_sim, "SPR_", 2, Aircraft, Sprayer),
+        // @Group: GRPS_
+        // @Path: ./SIM_Gripper_Servo.cpp
+        AP_SUBGROUPINFO(gripper_sim, "GRPS_", 3, Aircraft, Gripper_Servo),
+        // @Group: GRPE_
+        // @Path: ./SIM_Gripper_EPM.cpp
+        AP_SUBGROUPINFO(gripper_epm_sim, "GRPE_", 4, Aircraft, Gripper_EPM),
+        AP_GROUPEND
+};
 /*
   parent class for all simulator types
  */
@@ -60,6 +73,7 @@ Aircraft::Aircraft(const char *home_str, const char *frame_str) :
     min_sleep_time(5000)
 #endif
 {
+    AP_Param::setup_object_defaults(this, var_info);
     // make the SIM_* variables available to simulator backends
     sitl = AP::sitl();
 
@@ -741,19 +755,19 @@ void Aircraft::update_external_payload(const struct SITL::sitl_input &input)
     external_payload_mass = 0;
 
     // update sprayer
-    if (sitl->sprayer_sim.is_enable()) {
-        sitl->sprayer_sim.update(input);
-        external_payload_mass += sitl->sprayer_sim.payload_mass();
+    if (sprayer_sim.is_enable()) {
+        sprayer_sim.update(input);
+        external_payload_mass += sprayer_sim.payload_mass();
     }
 
     // update gripper
-    if (sitl->gripper_sim.is_enable()) {
-        sitl->gripper_sim.set_alt(hagl());
-        sitl->gripper_sim.update(input);
-        external_payload_mass += sitl->gripper_sim.payload_mass();
+    if (gripper_sim.is_enable()) {
+        gripper_sim.set_alt(hagl());
+        gripper_sim.update(input);
+        external_payload_mass += gripper_sim.payload_mass();
     }
-    if (sitl->gripper_epm_sim.is_enable()) {
-        sitl->gripper_epm_sim.update(input);
+    if (gripper_epm_sim.is_enable()) {
+        gripper_epm_sim.update(input);
         // external_payload_mass += gripper_epm.payload_mass();
     }
 }

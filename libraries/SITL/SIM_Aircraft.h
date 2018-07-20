@@ -23,6 +23,10 @@
 #include "SITL.h"
 #include <AP_Terrain/AP_Terrain.h>
 
+#include "SIM_Sprayer.h"
+#include "SIM_Gripper_Servo.h"
+#include "SIM_Gripper_EPM.h"
+
 namespace SITL {
 
 /*
@@ -31,6 +35,10 @@ namespace SITL {
 class Aircraft {
 public:
     Aircraft(const char *home_str, const char *frame_str);
+
+    /* Do not allow copies */
+    Aircraft(const SITL &other) = delete;
+    Aircraft &operator=(const Aircraft&) = delete;
 
     /*
       set simulation speedup
@@ -103,6 +111,7 @@ public:
     void get_attitude(Quaternion &attitude) const {
         attitude.from_rotation_matrix(dcm);
     }
+    static const struct AP_Param::GroupInfo var_info[];
 
 protected:
     SITL *sitl;
@@ -227,7 +236,7 @@ private:
     uint32_t frame_counter = 0;
     uint32_t last_ground_contact_ms;
     const uint32_t min_sleep_time;
-
+    AP_Int8 plop;
     struct {
         bool enabled;
         Vector3f accel_body;
@@ -240,6 +249,9 @@ private:
     } smoothing;
 
     LowPassFilterFloat servo_filter[4];
+    Sprayer sprayer_sim;
+    Gripper_Servo gripper_sim;
+    Gripper_EPM gripper_epm_sim;
 };
 
 } // namespace SITL
