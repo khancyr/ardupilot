@@ -4,6 +4,7 @@
 #include "AP_OpticalFlow_SITL.h"
 #include "AP_OpticalFlow_Pixart.h"
 #include "AP_OpticalFlow_PX4Flow.h"
+#include "AP_OpticalFlow_CXOF.h"
 
 extern const AP_HAL::HAL& hal;
 
@@ -98,6 +99,9 @@ void OpticalFlow::init(void)
         }
         if (AP_BoardConfig::get_board_type() == AP_BoardConfig::PX4_BOARD_SP01) {
             backend = AP_OpticalFlow_Pixart::detect("pixartPC15", *this);
+        }
+        if (AP_OpticalFlow_CXOF::detect(AP::serialmanager())) {
+            backend = new AP_OpticalFlow_CXOF(*this, AP::serialmanager());
         }
         if (backend == nullptr) {
             backend = AP_OpticalFlow_PX4Flow::detect(*this);
