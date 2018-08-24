@@ -199,6 +199,7 @@ T constrain_value(const T amt, const T low, const T high)
     return amt;
 }
 
+template uint8_t constrain_value<uint8_t>(const uint8_t amt, const uint8_t low, const uint8_t high);
 template int constrain_value<int>(const int amt, const int low, const int high);
 template long constrain_value<long>(const long amt, const long low, const long high);
 template long long constrain_value<long long>(const long long amt, const long long low, const long long high);

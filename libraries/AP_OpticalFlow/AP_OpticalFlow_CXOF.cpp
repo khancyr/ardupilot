@@ -45,7 +45,7 @@ bool AP_OpticalFlow_CXOF::detect(AP_SerialManager &serial_manager)
 }
 
 // read - return last value measured by sensor
-bool AP_OpticalFlow_CXOF::get_reading()
+bool AP_OpticalFlow_CXOF::get_reading(struct OpticalFlow::OpticalFlow_state& state)
 {
     if (uart == nullptr) {
         return false;
@@ -58,7 +58,6 @@ bool AP_OpticalFlow_CXOF::get_reading()
         return false;
     }
 
-    struct OpticalFlow::OpticalFlow_state state;
     while (nbytes-- > 0) {
         received_char = uart->read();
         if (pkt_count == 0) {
@@ -81,12 +80,14 @@ bool AP_OpticalFlow_CXOF::get_reading()
                 if (input_buffer[0] == 0xFE && input_buffer[8] == 0xAA) {
                     // Valid packet
                     state.device_id = 1;
-                    state.surface_quality = (constrain_value(input_buffer[7], 64, 78) - 64) * 100 / 14;
+                    state.surface_quality = (constrain_value(input_buffer[7], (uint8_t)64, (uint8_t)78) - 64) * 100 / 14;
                     const Vector2f flowScaler = _flowScaler();
                     float flowScaleFactorX = 1.0f + 0.001f * flowScaler.x;
                     float flowScaleFactorY = 1.0f + 0.001f * flowScaler.y;
-                    state.flowRate = Vector2f(pkt->motionX * flowScaleFactorX,
-                                              pkt->motionY * flowScaleFactorY);
+                    const uint16_t motionX = ((uint16_t) input_buffer[2] << 8) | input_buffer[3];
+                    const uint16_t motionY = ((uint16_t) input_buffer[4] << 8) | input_buffer[5];
+                    state.flowRate = Vector2f(motionX * flowScaleFactorX,
+                                              motionY * flowScaleFactorY);
                     // we only apply yaw to flowRate as body rate comes from AHRS
                     _applyYaw(state.flowRate);
                     const Vector3f &gyro = AP::ahrs().get_gyro();
@@ -108,10 +109,11 @@ bool AP_OpticalFlow_CXOF::get_reading()
 /*
    update the state of the sensor
 */
-void AP_OpticalFlow_CXOF::update(void)
+void AP_OpticalFlow_CXOF::update()
 {
-    if (!get_reading()) {
+    struct OpticalFlow::OpticalFlow_state state{};
+    if (!get_reading(state)) {
         return;
     }
-
+    _update_frontend(state);
 }

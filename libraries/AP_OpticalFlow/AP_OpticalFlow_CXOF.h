@@ -24,7 +24,7 @@ protected:
 
 private:
     // get a reading
-    bool get_reading();
+    bool get_reading(struct OpticalFlow::OpticalFlow_state& state);
     static const uint8_t CXOF_PACKET_SIZE = 9;
     uint8_t input_buffer[CXOF_PACKET_SIZE];
     uint8_t pkt_count;
