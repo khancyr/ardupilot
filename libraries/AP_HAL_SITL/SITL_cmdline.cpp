@@ -77,6 +77,7 @@ void SITL_State::_usage(void)
            "\t--sim-port-in PORT       set port num for simulator in\n"
            "\t--sim-port-out PORT      set port num for simulator out\n"
            "\t--irlock-port PORT       set port num for irlock\n"
+           "\t--sysid ID               set SYSID_THISMAV\n"
         );
 }
 
@@ -150,6 +151,7 @@ enum long_options {
     CMDLINE_SIM_PORT_IN,
     CMDLINE_SIM_PORT_OUT,
     CMDLINE_IRLOCK_PORT,
+    CMDLINE_SYSID,
 };
 
 static const struct GetOptLong::option options[] = {
@@ -183,6 +185,7 @@ static const struct GetOptLong::option options[] = {
         {"sim-port-in",     true,   0, CMDLINE_SIM_PORT_IN},
         {"sim-port-out",    true,   0, CMDLINE_SIM_PORT_OUT},
         {"irlock-port",     true,   0, CMDLINE_IRLOCK_PORT},
+        {"sysid",           true,   0, CMDLINE_SYSID},
         {0, false, 0, 0}
 };
 
@@ -326,6 +329,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         case CMDLINE_IRLOCK_PORT:
             _irlock_port = atoi(gopt.optarg);
             break;
+        case CMDLINE_SYSID:
+            break;
         default:
             _usage();
             exit(1);
@@ -408,6 +413,16 @@ void SITL_State::_parse_param_options(int argc, char * const argv[])
         case 's': {
             const float speedup = strtof(gopt.optarg, nullptr);
             _set_param_default("SIM_SPEEDUP", speedup);
+            break;
+        }
+        case CMDLINE_SYSID: {
+            errno = 0;
+            const int32_t sysid = strtol(gopt.optarg, nullptr, 0);
+            if (errno != 0 || sysid < 1 || sysid > 255) {
+                fprintf(stderr, "You must specify a SYSID greater than 0 and less than 256\n");
+                exit(1);
+            }
+            _set_param_default("SYSID_THISMAV", sysid);
             break;
         }
         default:
