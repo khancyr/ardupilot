@@ -24,6 +24,12 @@ WIND = "0,180,0.2"  # speed,direction,variance
 
 class AutoTestQuadPlane(AutoTest):
 
+    def generate_arm_mode_list(self):
+        self.NOT_ARMABLE_MODES_LIST = []
+        self.NOT_DISARMED_SETTABLE_MODES_LIST = []
+        self.POSITION_ARMABLE_MODES_LIST = []
+        self.NORMAL_ARMABLE_MODES_LIST = []
+
     def default_frame(self):
         return "quadplane"
 

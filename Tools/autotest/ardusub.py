@@ -12,7 +12,11 @@ from pysim import util
 from common import AutoTest
 from common import NotAchievedException
 
+# get location of scripts
+testdir = os.path.dirname(os.path.realpath(__file__))
+
 SITL_START_LOCATION = mavutil.location(33.810313, -118.393867, 0, 185)
+
 
 class Joystick():
     Pitch = 1
@@ -22,7 +26,14 @@ class Joystick():
     Forward = 5
     Lateral = 6
 
+
 class AutoTestSub(AutoTest):
+
+    def generate_arm_mode_list(self):
+        self.NOT_ARMABLE_MODES_LIST = []
+        self.NOT_DISARMED_SETTABLE_MODES_LIST = []
+        self.POSITION_ARMABLE_MODES_LIST = ["AUTO", "GUIDED", "CIRCLE", "POSHOLD"]
+        self.NORMAL_ARMABLE_MODES_LIST = ["ACRO", "ALT_HOLD", "MANUAL", "STABILIZE", "SURFACE"]
 
     def log_name(self):
         return "ArduSub"
@@ -47,6 +58,9 @@ class AutoTestSub(AutoTest):
 
     def is_sub(self):
         return True
+
+    def load_arming_test_mission(self):
+        self.load_mission(os.path.join(testdir, "ArduSub-Missions", "test_arming.txt"))
 
     def dive_manual(self):
         self.wait_ready_to_arm()

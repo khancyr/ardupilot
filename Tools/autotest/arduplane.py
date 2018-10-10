@@ -24,6 +24,12 @@ WIND = "0,180,0.2"  # speed,direction,variance
 
 class AutoTestPlane(AutoTest):
 
+    def generate_arm_mode_list(self):
+        self.NOT_ARMABLE_MODES_LIST = []
+        self.NOT_DISARMED_SETTABLE_MODES_LIST = []
+        self.POSITION_ARMABLE_MODES_LIST = ["GUIDED", "AUTO"]
+        self.NORMAL_ARMABLE_MODES_LIST = ["MANUAL", "STABILIZE", "ACRO"]
+
     def log_name(self):
         return "ArduPlane"
 
@@ -55,6 +61,9 @@ class AutoTestPlane(AutoTest):
 
     def set_autodisarm_delay(self, delay):
         self.set_parameter("LAND_DISARMDELAY", delay)
+
+    def load_arming_test_mission(self):
+        self.load_mission(os.path.join(testdir, "ArduPlane-Missions", "test_arming.txt"))
 
     def takeoff(self, alt=150, alt_max=None, relative=True):
         """Takeoff to altitude."""

@@ -34,6 +34,12 @@ SITL_START_LOCATION_AVC = mavutil.location(40.072842, -105.230575, 1586, 0)
 
 class AutoTestCopter(AutoTest):
 
+    def generate_arm_mode_list(self):
+        self.NOT_ARMABLE_MODES_LIST = ["AUTO", "AUTOTUNE", "BRAKE", "CIRCLE", "FLIP", "LAND", "RTL", "SMART_RTL", "AVOID_ADSB", "FOLLOW"]
+        self.NOT_DISARMED_SETTABLE_MODES_LIST = ["FLIP", "AUTOTUNE"]
+        self.POSITION_ARMABLE_MODES_LIST = ["DRIFT", "GUIDED", "LOITER", "POSHOLD", "THROW"]
+        self.NORMAL_ARMABLE_MODES_LIST = ["ACRO", "ALT_HOLD", "SPORT", "STABILIZE", "GUIDED_NOGPS"]
+
     def log_name(self):
         return "ArduCopter"
 

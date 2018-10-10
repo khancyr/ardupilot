@@ -196,6 +196,10 @@ class AutoTest(ABC):
         self.run_tests_called = False
         self._show_test_timings = _show_test_timings
         self.test_timings = dict()
+        self.NOT_ARMABLE_MODES_LIST = []
+        self.NOT_DISARMED_SETTABLE_MODES_LIST = []
+        self.POSITION_ARMABLE_MODES_LIST = []
+        self.NORMAL_ARMABLE_MODES_LIST = []
 
     @staticmethod
     def progress(text):
@@ -850,6 +854,10 @@ class AutoTest(ABC):
     def get_disarm_delay(self):
         """Return disarm delay value."""
         raise ErrorException("Disarm delay is not supported by vehicle %s frame %s", (self.vehicleinfo_key(), self.frame))
+
+    def load_arming_test_mission(self):
+        """Load arming test mission."""
+        pass
 
     def armed(self):
         """Return true if vehicle is armed and safetyoff"""
@@ -1759,6 +1767,29 @@ class AutoTest(ABC):
         raise AutoTestTimeoutException("Failed to get EKF.flags=%u" %
                                        required_value)
 
+    def wait_gps_disable(self, timeout=30):
+        """Wait for EKF to be worried of GPS"""
+        self.set_parameter("SIM_GPS_DISABLE", 1)
+        tstart = self.get_sim_time()
+        # all of these must NOT be set for arming NOT to happen:
+        not_required_value = (mavutil.mavlink.ESTIMATOR_VELOCITY_HORIZ |
+                              mavutil.mavlink.ESTIMATOR_POS_HORIZ_REL |
+                              mavutil.mavlink.ESTIMATOR_POS_HORIZ_ABS |
+                              mavutil.mavlink.ESTIMATOR_PRED_POS_HORIZ_ABS)
+        self.progress("Waiting for EKF not having bits %u" % not_required_value)
+        last_print_time = 0
+        while timeout is None or self.get_sim_time_cached() < tstart + timeout:
+            m = self.mav.recv_match(type='EKF_STATUS_REPORT', blocking=True)
+            current = m.flags
+            if self.get_sim_time_cached() - last_print_time > 1:
+                self.progress("Wait EKF.flags: not required:%u current:%u" %
+                              (not_required_value, current))
+                last_print_time = self.get_sim_time_cached()
+            if current & not_required_value == 0:
+                self.progress("EKF Flags OK")
+                return
+        raise AutoTestTimeoutException("Failed to get EKF.flags=%u disabled" % not_required_value)
+
     def wait_text(self, text, timeout=20, the_function=None):
         """Wait a specific STATUS_TEXT."""
         self.progress("Waiting for text : %s" % text.lower())
@@ -1908,6 +1939,11 @@ class AutoTest(ABC):
         self.progress("Waiting for Parameters")
         self.mavproxy.expect('Received [0-9]+ parameters')
 
+    @abc.abstractmethod
+    def generate_arm_mode_list(self):
+        """Fill the armable mode lists."""
+        pass
+
     def init(self):
         """Initilialize autotest feature."""
         self.check_test_syntax(test_file=self.test_filepath())
@@ -1943,8 +1979,9 @@ class AutoTest(ABC):
         self.expect_list_clear()
         self.expect_list_extend([self.sitl, self.mavproxy])
 
-        self.progress("Ready to start testing!")
+        self.generate_arm_mode_list()
 
+        self.progress("Ready to start testing!")
 
     def poll_home_position(self, quiet=False):
         old = self.mav.messages.get("HOME_POSITION", None)
@@ -2139,6 +2176,7 @@ class AutoTest(ABC):
     def test_arm_feature(self):
         """Common feature to test."""
         # TEST ARMING/DISARM
+        self.set_parameter("ARMING_CHECK", 1)  # ensure that arming check are on
         if not self.is_sub() and not self.is_tracker():
             self.set_parameter("ARMING_RUDDER", 2)  # allow arm and disarm with rudder on first tests
         if self.is_copter():
@@ -2168,7 +2206,7 @@ class AutoTest(ABC):
             raise NotAchievedException("Failed to DISARM")
 
         if not self.is_sub():
-            self.progress("arm with rc input")
+            self.start_subtest("Test arm with rc input")
             if not self.arm_motors_with_rc_input():
                 raise NotAchievedException("Failed to arm with RC input")
             self.progress("disarm with rc input")
@@ -2269,8 +2307,81 @@ class AutoTest(ABC):
                             self.set_rc(interlock_channel, 1000)
                             raise NotAchievedException("Motor interlock was changed while disarmed")
                 self.set_rc(interlock_channel, 1000)
+
+        self.start_subtest("Test all mode arming")
+        self.load_arming_test_mission()
+        try:
+            for mode in self.mav.mode_mapping():
+                self.start_subtest("Mode : %s" % mode)
+                if mode == "FOLLOW":
+                    self.set_parameter("FOLL_ENABLE", 1)
+                if mode in self.NORMAL_ARMABLE_MODES_LIST:
+                    self.progress("Armable mode : %s" % mode)
+                    self.do_set_mode_via_command_long(mode)
+                    self.arm_vehicle()
+                    if not self.disarm_vehicle():
+                        self.progress("Failed to DISARM")
+                        raise NotAchievedException()
+                    self.progress("PASS arm mode : %s" % mode)
+                if mode in self.NOT_ARMABLE_MODES_LIST:
+                    if mode in self.NOT_DISARMED_SETTABLE_MODES_LIST:
+                        self.progress("Not settable mode : %s" % mode)
+                        try:
+                            self.do_set_mode_via_command_long(mode, timeout=2)
+                        except AutoTestTimeoutException:
+                            self.progress("PASS not arm mode : %s" % mode)
+                            pass
+                        except ValueError:
+                            self.progress("PASS not arm mode : %s" % mode)
+                            pass
+                    else:
+                        self.progress("Not armable mode : %s" % mode)
+                        self.do_set_mode_via_command_long(mode)
+                        self.run_cmd(mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                                     1,  # ARM
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     want_result=mavutil.mavlink.MAV_RESULT_FAILED
+                                     )
+                    self.progress("PASS not arm mode : %s" % mode)
+                if mode in self.POSITION_ARMABLE_MODES_LIST:
+                    self.progress("Armable mode needing Position : %s" % mode)
+                    self.wait_ekf_happy()
+                    self.do_set_mode_via_command_long(mode)
+                    self.arm_vehicle(timeout=30)
+                    if not self.disarm_vehicle():
+                        self.progress("Failed to DISARM")
+                        raise NotAchievedException()
+                    self.progress("PASS arm mode : %s" % mode)
+                    self.progress("Not armable mode without Position : %s" % mode)
+                    self.wait_gps_disable()
+                    self.do_set_mode_via_command_long(mode)
+                    self.run_cmd(mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+                                 1,  # ARM
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 want_result=mavutil.mavlink.MAV_RESULT_FAILED
+                                 )
+                    self.set_parameter("SIM_GPS_DISABLE", 0)
+                    self.progress("PASS not arm mode without Position: %s" % mode)
+                if mode == "FOLLOW":
+                    self.set_parameter("FOLL_ENABLE", 0)
+        finally:
+            self.do_set_mode_via_command_long(self.default_mode())
+            if self.armed():
+                if not self.disarm_vehicle():
+                    self.progress("Failed to DISARM")
+                    raise NotAchievedException()
         self.progress("ALL PASS")
-        # TODO : add failure test : arming check, wrong mode; Test arming magic; Same for disarm
+    # TODO : Test arming magic;
 
     def get_message_rate(self, victim_message, timeout):
         tstart = self.get_sim_time()
