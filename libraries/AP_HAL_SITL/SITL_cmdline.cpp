@@ -231,7 +231,8 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             printf("Erasing EEPROM...\n");
             printf("Warning: parameters set with cmdline will be lost!\n");
             AP_Param::erase_all();
-            unlink("eeprom.bin");
+            AP_Param::sitl_has_reset_param = true;
+            //unlink("eeprom.bin");
             printf("done.\n");
         }
             break;

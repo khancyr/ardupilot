@@ -81,6 +81,7 @@ public:
         "tcp:5",
         "tcp:6",
     };
+    bool _has_reset_param;
     
 private:
     void _parse_command_line(int argc, char * const argv[]);
