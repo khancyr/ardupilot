@@ -66,7 +66,7 @@ GCS_MAVLINK::init(AP_HAL::UARTDriver *port, mavlink_channel_t mav_chan)
 
     _port = port;
     chan = mav_chan;
-
+    GCS_MAVLINK::disable_channel_routing(chan);
     mavlink_comm_port[chan] = _port;
     _queued_parameter = nullptr;
 
