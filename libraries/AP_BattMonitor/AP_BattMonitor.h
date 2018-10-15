@@ -135,6 +135,7 @@ public:
 
     /// returns true if a battery failsafe has ever been triggered
     bool has_failsafed(void) const { return _has_triggered_failsafe; };
+    void clear_failsafe_flags();
 
     /// returns the highest failsafe action that has been triggered
     int8_t get_highest_failsafe_priority(void) const { return _highest_failsafe_priority; };

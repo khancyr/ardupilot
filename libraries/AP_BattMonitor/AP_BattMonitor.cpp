@@ -392,6 +392,13 @@ void AP_BattMonitor::check_failsafes(void)
     }
 }
 
+void AP_BattMonitor::clear_failsafe_flags() {
+    if (_has_triggered_failsafe) {
+        _has_triggered_failsafe = false;
+        AP_Notify::flags.failsafe_battery = false;
+        state[0].failsafe = AP_BattMonitor::BatteryFailsafe_None;
+    }
+}
 // return true if any battery is pushing too much power
 bool AP_BattMonitor::overpower_detected() const
 {
