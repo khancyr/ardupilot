@@ -477,7 +477,7 @@ static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_GPS2_RTK,
     MSG_NAV_CONTROLLER_OUTPUT,
     MSG_FENCE_STATUS,
-    MSG_POSITION_TARGET_GLOBAL_INT,
+    //MSG_POSITION_TARGET_GLOBAL_INT,
 };
 static const ap_message STREAM_POSITION_msgs[] = {
     MSG_LOCATION,
@@ -492,7 +492,9 @@ static const ap_message STREAM_RC_CHANNELS_msgs[] = {
 static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
     MSG_SIMSTATE, // SIMSTATE, AHRS2
-    MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
+    //MSG_PID_TUNING // Up to four PID_TUNING messages are sent, depending on GCS_PID_MASK parameter
+        MSG_SYSTEM_TIME,
+    MSG_BATTERY_STATUS,
 };
 static const ap_message STREAM_EXTRA2_msgs[] = {
     MSG_VFR_HUD
@@ -500,13 +502,13 @@ static const ap_message STREAM_EXTRA2_msgs[] = {
 static const ap_message STREAM_EXTRA3_msgs[] = {
     MSG_AHRS,
     MSG_HWSTATUS,
-    MSG_SYSTEM_TIME,
+
     MSG_RANGEFINDER,
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     MSG_TERRAIN,
 #endif
     MSG_BATTERY2,
-    MSG_BATTERY_STATUS,
+
     MSG_MOUNT_STATUS,
     MSG_OPTICAL_FLOW,
     MSG_GIMBAL_REPORT,
