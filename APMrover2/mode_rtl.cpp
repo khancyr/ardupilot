@@ -32,6 +32,7 @@ void ModeRTL::update()
         // trigger reached
         _reached_destination = true;
         gcs().send_text(MAV_SEVERITY_INFO, "Reached destination");
+        rover.disarm_motors();
     }
     // determine if we should keep navigating
     if (!_reached_destination || (rover.is_boat() && !near_wp)) {
