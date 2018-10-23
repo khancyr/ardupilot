@@ -25,8 +25,8 @@ namespace SITL {
 
 SimRover::SimRover(const char *home_str, const char *frame_str) :
     Aircraft(home_str, frame_str),
-    max_speed(20),
-    max_accel(10),
+    max_speed(10),
+    max_accel(8),
     max_wheel_turn(35),
     turning_circle(1.8),
     skid_turn_rate(140), // degrees/sec
