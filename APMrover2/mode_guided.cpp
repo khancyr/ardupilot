@@ -3,6 +3,15 @@
 
 bool ModeGuided::_enter()
 {
+    // refuse GUIDED if home has not been set
+    if (!AP::ahrs().home_is_set()) {
+        return false;
+    }
+    nav_filter_status filt_status;
+    rover.ahrs.get_filter_status(filt_status);
+    if (!(filt_status.flags.horiz_pos_abs || filt_status.flags.pred_horiz_pos_abs)) {
+        return false;
+    }
     // initialise waypoint speed
     set_desired_speed_to_default();
 
