@@ -225,9 +225,12 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
 
     while ((opt = gopt.getoption()) != -1) {
         switch (opt) {
-        case 'w':
+        case 'w': {
+            printf("Erasing EEPROM...\n");
+            unlink("eeprom.bin");
             AP_Param::erase_all();
-            unlink("dataflash.bin");
+            printf("done.\n");
+        }
             break;
         case 'u':
             AP_Param::set_hide_disabled_groups(false);
