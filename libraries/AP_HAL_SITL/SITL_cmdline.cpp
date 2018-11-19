@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
+#include <limits.h>
 #include <AP_HAL/utility/getopt_cpp.h>
 
 #include <SITL/SIM_Multicopter.h>
@@ -129,56 +131,28 @@ void SITL_State::_set_signal_handlers(void) const
     sigaction(SIGPIPE, &sa_pipe, nullptr);
 }
 
-void SITL_State::_parse_command_line(int argc, char * const argv[])
-{
-    int opt;
-    float speedup = 1.0f;
-    _instance = 0;
-    _synthetic_clock_mode = false;
-    // default to CMAC
-    const char *home_str = "-35.363261,149.165230,584,353";
-    const char *model_str = nullptr;
-    _use_fg_view = true;
-    char *autotest_dir = nullptr;
-    _fg_address = "127.0.0.1";
+enum long_options {
+    CMDLINE_GIMBAL = 1,
+    CMDLINE_FGVIEW,
+    CMDLINE_AUTOTESTDIR,
+    CMDLINE_DEFAULTS,
+    CMDLINE_UARTA,
+    CMDLINE_UARTB,
+    CMDLINE_UARTC,
+    CMDLINE_UARTD,
+    CMDLINE_UARTE,
+    CMDLINE_UARTF,
+    CMDLINE_UARTG,
+    CMDLINE_RTSCTS,
+    CMDLINE_BASE_PORT,
+    CMDLINE_RCIN_PORT,
+    CMDLINE_SIM_ADDRESS = 15,
+    CMDLINE_SIM_PORT_IN,
+    CMDLINE_SIM_PORT_OUT,
+    CMDLINE_IRLOCK_PORT,
+};
 
-    const int BASE_PORT = 5760;
-    const int RCIN_PORT = 5501;
-    const int FG_VIEW_PORT = 5503;
-    _base_port = BASE_PORT;
-    _rcin_port = RCIN_PORT;
-    _fg_view_port = FG_VIEW_PORT;
-
-    const int SIM_IN_PORT = 9003;
-    const int SIM_OUT_PORT = 9002;
-    const int IRLOCK_PORT = 9005;
-    const char * simulator_address = "127.0.0.1";
-    uint16_t simulator_port_in = SIM_IN_PORT;
-    uint16_t simulator_port_out = SIM_OUT_PORT;
-    _irlock_port = IRLOCK_PORT;
-
-    enum long_options {
-        CMDLINE_GIMBAL = 1,
-        CMDLINE_FGVIEW,
-        CMDLINE_AUTOTESTDIR,
-        CMDLINE_DEFAULTS,
-        CMDLINE_UARTA,
-        CMDLINE_UARTB,
-        CMDLINE_UARTC,
-        CMDLINE_UARTD,
-        CMDLINE_UARTE,
-        CMDLINE_UARTF,
-        CMDLINE_UARTG,
-        CMDLINE_RTSCTS,
-        CMDLINE_BASE_PORT,
-        CMDLINE_RCIN_PORT,
-        CMDLINE_SIM_ADDRESS = 15,
-        CMDLINE_SIM_PORT_IN,
-        CMDLINE_SIM_PORT_OUT,
-        CMDLINE_IRLOCK_PORT,
-    };
-
-    const struct GetOptLong::option options[] = {
+static const struct GetOptLong::option options[] = {
         {"help",            false,  0, 'h'},
         {"wipe",            false,  0, 'w'},
         {"unhide-groups",   false,  0, 'u'},
@@ -210,7 +184,38 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         {"sim-port-out",    true,   0, CMDLINE_SIM_PORT_OUT},
         {"irlock-port",     true,   0, CMDLINE_IRLOCK_PORT},
         {0, false, 0, 0}
-    };
+};
+
+static const char option_sting[] = "hwus:r:CI:P:SO:M:F:";
+
+void SITL_State::_parse_command_line(int argc, char * const argv[])
+{
+    int opt;
+    float speedup = 1.0f;
+    _instance = 0;
+    _synthetic_clock_mode = false;
+    // default to CMAC
+    const char *home_str = "-35.363261,149.165230,584,353";
+    const char *model_str = nullptr;
+    _use_fg_view = true;
+    char *autotest_dir = nullptr;
+    _fg_address = "127.0.0.1";
+
+    const int BASE_PORT = 5760;
+    const int RCIN_PORT = 5501;
+    const int FG_VIEW_PORT = 5503;
+    _base_port = BASE_PORT;
+    _rcin_port = RCIN_PORT;
+    _fg_view_port = FG_VIEW_PORT;
+
+    const int SIM_IN_PORT = 9003;
+    const int SIM_OUT_PORT = 9002;
+    const int IRLOCK_PORT = 9005;
+    const char * simulator_address = "127.0.0.1";
+    uint16_t simulator_port_in = SIM_IN_PORT;
+    uint16_t simulator_port_out = SIM_OUT_PORT;
+    _irlock_port = IRLOCK_PORT;
+
 
     if (asprintf(&autotest_dir, SKETCHBOOK "/Tools/autotest") <= 0) {
         AP_HAL::panic("out of memory");
@@ -220,8 +225,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     setvbuf(stdout, (char *)0, _IONBF, 0);
     setvbuf(stderr, (char *)0, _IONBF, 0);
 
-    GetOptLong gopt(argc, argv, "hwus:r:CI:P:SO:M:F:",
-                    options);
+    GetOptLong gopt(argc, argv, option_sting, options);
 
     while ((opt = gopt.getoption()) != -1) {
         switch (opt) {
@@ -237,9 +241,6 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
             break;
         case 's':
             speedup = strtof(gopt.optarg, nullptr);
-            char speedup_string[18];
-            snprintf(speedup_string, sizeof(speedup_string), "SIM_SPEEDUP=%s", gopt.optarg);
-            _set_param_default(speedup_string);
             break;
         case 'r':
             _framerate = (unsigned)atoi(gopt.optarg);
@@ -270,7 +271,6 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
         }
         break;
         case 'P':
-            _set_param_default(gopt.optarg);
             break;
         case 'S':
             _synthetic_clock_mode = true;
@@ -381,6 +381,39 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     }
 
     _sitl_setup(home_str);
+}
+
+void SITL_State::_parse_param_options(int argc, char * const argv[])
+{
+    int opt;
+    GetOptLong gopt(argc, argv, option_sting, options);
+
+    while ((opt = gopt.getoption()) != -1) {
+        switch (opt) {
+        case 'P': {
+            char *pdup = strdup(gopt.optarg);
+            char *p = strchr(pdup, '=');
+            
+            if (p == nullptr) {
+                printf("Please specify parameter as NAME=VALUE");
+                exit(1);
+            }
+            
+            float value = strtof(p+1, nullptr);
+            *p = 0;
+            _set_param_default(pdup, value);
+            free(pdup);
+            break;
+        }
+        case 's': {
+            const float speedup = strtof(gopt.optarg, nullptr);
+            _set_param_default("SIM_SPEEDUP", speedup);
+            break;
+        }
+        default:
+            break;
+        }
+    }
 }
 
 #endif
