@@ -283,53 +283,20 @@ void ModeRTL::descent_start()
 //      called by rtl_run at 100hz or more
 void ModeRTL::descent_run()
 {
-    float target_roll = 0.0f;
-    float target_pitch = 0.0f;
-    float target_yaw_rate = 0.0f;
-
     // if not armed set throttle to zero and exit immediately
     if (is_disarmed_or_landed()) {
         make_safe_spool_down();
         return;
     }
 
-    // process pilot's input
-    if (!copter.failsafe.radio) {
-        if ((g.throttle_behavior & THR_BEHAVE_HIGH_THROTTLE_CANCELS_LAND) != 0 && copter.rc_throttle_control_in_filter.get() > LAND_CANCEL_TRIGGER_THR){
-            AP::logger().Write_Event(LogEvent::LAND_CANCELLED_BY_PILOT);
-            // exit land if throttle is high
-            if (!copter.set_mode(Mode::Number::LOITER, ModeReason::THROTTLE_LAND_ESCAPE)) {
-                copter.set_mode(Mode::Number::ALT_HOLD, ModeReason::THROTTLE_LAND_ESCAPE);
-            }
-        }
-
-        if (g.land_repositioning) {
-            // apply SIMPLE mode transform to pilot inputs
-            update_simple_mode();
-
-            // convert pilot input to lean angles
-            get_pilot_desired_lean_angles(target_roll, target_pitch, loiter_nav->get_angle_max_cd(), attitude_control->get_althold_lean_angle_max());
-
-            // record if pilot has overridden roll or pitch
-            if (!is_zero(target_roll) || !is_zero(target_pitch)) {
-                if (!copter.ap.land_repo_active) {
-                    AP::logger().Write_Event(LogEvent::LAND_REPO_ACTIVE);
-                }
-                copter.ap.land_repo_active = true;
-            }
-        }
-
-        if (g.land_repositioning || use_pilot_yaw()) {
-            // get pilot's desired yaw rate
-            target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
-        }
-    }
+    float target_roll = 0.0f;
+    float target_pitch = 0.0f;
+    float target_yaw_rate = 0.0f;
+    // process LAND_CANCEL, repositioning, yaw control
+    process_pilot_land_correction(true, target_roll, target_pitch, target_yaw_rate);
 
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
-
-    // process roll, pitch inputs
-    loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch, G_Dt);
 
     // run loiter controller
     loiter_nav->update();

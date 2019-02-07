@@ -88,31 +88,11 @@ void ModeLand::gps_run()
 //      should be called at 100hz or more
 void ModeLand::nogps_run()
 {
-    float target_roll = 0.0f, target_pitch = 0.0f;
-    float target_yaw_rate = 0;
 
-    // process pilot inputs
-    if (!copter.failsafe.radio) {
-        if ((g.throttle_behavior & THR_BEHAVE_HIGH_THROTTLE_CANCELS_LAND) != 0 && copter.rc_throttle_control_in_filter.get() > LAND_CANCEL_TRIGGER_THR){
-            AP::logger().Write_Event(LogEvent::LAND_CANCELLED_BY_PILOT);
-            // exit land if throttle is high
-            copter.set_mode(Mode::Number::ALT_HOLD, ModeReason::THROTTLE_LAND_ESCAPE);
-        }
-
-        if (g.land_repositioning) {
-            // apply SIMPLE mode transform to pilot inputs
-            update_simple_mode();
-
-            // get pilot desired lean angles
-            get_pilot_desired_lean_angles(target_roll, target_pitch, copter.aparm.angle_max, attitude_control->get_althold_lean_angle_max());
-        }
-
-        // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
-        if (!is_zero(target_yaw_rate)) {
-            auto_yaw.set_mode(AUTO_YAW_HOLD);
-        }
-    }
+    float target_roll = 0.0f;
+    float target_pitch = 0.0f;
+    float target_yaw_rate = 0.0f;
+    process_pilot_land_correction(false, target_roll, target_pitch, target_yaw_rate);
 
     // disarm when the landing detector says we've landed
     if (copter.ap.land_complete && motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE) {

@@ -250,6 +250,7 @@ public:
     GCS_Copter &gcs();
     void set_throttle_takeoff(void);
     uint16_t get_pilot_speed_dn(void);
+    void process_pilot_land_correction(bool has_position, float &target_roll, float &target_pitch, float &target_yaw_rate) const;
 
     // end pass-through functions
 };
