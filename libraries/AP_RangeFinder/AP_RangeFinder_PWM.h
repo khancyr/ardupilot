@@ -34,6 +34,8 @@ public:
     // update state
     void update(void) override;
 
+    static const struct AP_Param::GroupInfo var_info[];
+
 protected:
 
     bool get_reading(uint16_t &reading_cm);
@@ -43,7 +45,9 @@ protected:
     }
 
 private:
-
+    AP_Int8  gpio_pin;
+    AP_Int8  stop_pin;
+    AP_Int16 powersave_range;
     int8_t last_pin; // last pin used for reading pwm (used to recognise change in pin assignment)
 
     // the following three members are updated by the interrupt handler

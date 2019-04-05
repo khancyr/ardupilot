@@ -20,6 +20,31 @@
 
 extern const AP_HAL::HAL& hal;
 
+const AP_Param::GroupInfo AP_RangeFinder_PWM::var_info[] = {
+        // @Param: PIN
+        // @DisplayName: Rangefinder pin
+        // @Description: Analog pin that rangefinder is connected to. Set to 11 on PX4 for the analog 'airspeed' port. Set to 15 on the Pixhawk for the analog 'airspeed' port.
+        // @Values: -1:Not Used, 11:PX4-airspeed port, 15:Pixhawk-airspeed port
+        // @User: Standard
+        AP_GROUPINFO("PIN",     1, AP_RangeFinder_PWM, gpio_pin, -1),
+
+        // @Param: STOP_PIN
+        // @DisplayName: Rangefinder stop pin
+        // @Description: Digital pin that enables/disables rangefinder measurement for an analog rangefinder. A value of -1 means no pin. If this is set, then the pin is set to 1 to enable the rangefinder and set to 0 to disable it. This can be used to ensure that multiple sonar rangefinders don't interfere with each other.
+        // @Values: -1:Not Used,50:Pixhawk AUXOUT1,51:Pixhawk AUXOUT2,52:Pixhawk AUXOUT3,53:Pixhawk AUXOUT4,54:Pixhawk AUXOUT5,55:Pixhawk AUXOUT6,111:PX4 FMU Relay1,112:PX4 FMU Relay2,113:PX4IO Relay1,114:PX4IO Relay2,115:PX4IO ACC1,116:PX4IO ACC2
+        // @User: Standard
+        AP_GROUPINFO("STOP_PIN", 2, AP_RangeFinder_PWM, stop_pin, -1),
+
+        // @Param: PWRRNG
+        // @DisplayName: Powersave range
+        // @Description: This parameter sets the estimated terrain distance in meters above which the sensor will be put into a power saving mode (if available). A value of zero means power saving is not enabled
+        // @Units: m
+        // @Range: 0 32767
+        // @User: Standard
+        AP_GROUPINFO("PWRRNG", 3, AP_RangeFinder_PWM, powersave_range, 0),
+
+        AP_GROUPEND
+};
 /*
    The constructor also initialises the rangefinder.
 */
@@ -29,6 +54,9 @@ AP_RangeFinder_PWM::AP_RangeFinder_PWM(RangeFinder::RangeFinder_State &_state,
     AP_RangeFinder_Backend(_state, _params),
     estimated_terrain_height(_estimated_terrain_height)
 {
+    AP_Param::setup_object_defaults(this, var_info);
+    // register Wasp specific parameters
+    state.var_info = var_info;
 }
 
 /*
@@ -73,7 +101,7 @@ bool AP_RangeFinder_PWM::get_reading(uint16_t &reading_cm)
 
 void AP_RangeFinder_PWM::check_pin()
 {
-    if (params.pin == last_pin) {
+    if (gpio_pin == last_pin) {
         return;
     }
 
@@ -89,17 +117,17 @@ void AP_RangeFinder_PWM::check_pin()
 
     // set last pin to params.pin so we don't continually try to attach
     // to it if the attach is failing
-    last_pin = params.pin;
+    last_pin = gpio_pin;
 
-    if (params.pin <= 0) {
+    if (gpio_pin <= 0) {
         // don't need to install handler
         return;
     }
 
     // install interrupt handler on rising and falling edge
-    hal.gpio->pinMode(params.pin, HAL_GPIO_INPUT);
+    hal.gpio->pinMode(gpio_pin, HAL_GPIO_INPUT);
     if (!hal.gpio->attach_interrupt(
-            params.pin,
+            gpio_pin,
             FUNCTOR_BIND_MEMBER(&AP_RangeFinder_PWM::irq_handler,
                                 void,
                                 uint8_t,
@@ -109,20 +137,20 @@ void AP_RangeFinder_PWM::check_pin()
         // failed to attach interrupt
         gcs().send_text(MAV_SEVERITY_WARNING,
                         "RangeFinder_PWM: Failed to attach to pin %u",
-                        params.pin);
+                        gpio_pin);
         return;
     }
 }
 
 void AP_RangeFinder_PWM::check_stop_pin()
 {
-    if (params.stop_pin == last_stop_pin) {
+    if (stop_pin == last_stop_pin) {
         return;
     }
 
-    hal.gpio->pinMode(params.stop_pin, HAL_GPIO_OUTPUT);
+    hal.gpio->pinMode(stop_pin, HAL_GPIO_OUTPUT);
 
-    last_stop_pin = params.stop_pin;
+    last_stop_pin = stop_pin;
 }
 
 void AP_RangeFinder_PWM::check_pins()
@@ -145,12 +173,12 @@ void AP_RangeFinder_PWM::update(void)
         return;
     }
 
-    if (params.stop_pin != -1) {
+    if (stop_pin != -1) {
         const bool oor = out_of_range();
         if (oor) {
             if (!was_out_of_range) {
                 // we are above the power saving range. Disable the sensor
-                hal.gpio->write(params.stop_pin, false);
+                hal.gpio->write(stop_pin, false);
                 set_status(RangeFinder::RangeFinder_NoData);
                 state.distance_cm = 0;
                 state.voltage_mv = 0;
@@ -160,7 +188,7 @@ void AP_RangeFinder_PWM::update(void)
         }
         // re-enable the sensor:
         if (!oor && was_out_of_range) {
-            hal.gpio->write(params.stop_pin, true);
+            hal.gpio->write(stop_pin, true);
             was_out_of_range = oor;
         }
     }
@@ -181,5 +209,5 @@ void AP_RangeFinder_PWM::update(void)
 
 // return true if we are beyond the power saving range
 bool AP_RangeFinder_PWM::out_of_range(void) const {
-    return params.powersave_range > 0 && estimated_terrain_height > params.powersave_range;
+    return powersave_range > 0 && estimated_terrain_height > powersave_range;
 }
