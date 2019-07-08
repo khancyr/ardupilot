@@ -356,7 +356,7 @@ class AutoTestRover(AutoTest):
         self.set_parameter('ATC_ACCEL_MAX', 15)
         self.change_mode("STEERING")
         self.set_rc(3, 2000)
-        self.wait_groundspeed(15, 100)
+        self.wait_groundspeed(15, 100, maintain_target_time=1)
         initial = self.mav.location()
         initial_time = time.time()
         while time.time() - initial_time < 2:
@@ -687,7 +687,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             # start moving forward a little:
             normal_rc_throttle = 1700
             self.mavproxy.send('rc 3 %u\n' % normal_rc_throttle)
-            self.wait_groundspeed(5, 100)
+            self.wait_groundspeed(5, 100, maintain_target_time=1)
 
             # allow overrides:
             self.set_rc(12, 2000)
@@ -4289,7 +4289,7 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
         self.change_mode("SMART_RTL")
 
         self.progress("Ensure we go via intermediate point")
-        self.wait_distance_to_location(loc, 0, 5)
+        self.wait_distance(loc, 0, 5)
 
         self.progress("Ensure we get home")
         self.wait_distance_to_home(3, 7, timeout=30)
