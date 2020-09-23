@@ -414,7 +414,7 @@ is bob we will attempt to checkout bob-AVR'''
                 try:
                     target = os.path.join("bin",
                                           "".join([binaryname, framesuffix]))
-                    self.run_waf(["build", "--targets", target])
+                    self.run_waf(["build", "--targets", target, "--summary-save"])
                 except subprocess.CalledProcessError:
                     msg = ("Failed build of %s %s%s %s" %
                            (vehicle, board, framesuffix, tag))
@@ -450,6 +450,11 @@ is bob we will attempt to checkout bob-AVR'''
                 if len(files_to_copy) == 0:
                     files_to_copy.append(bare_path)
 
+                summary_file = os.path.join(self.buildroot,
+                                            board,
+                                            "build_summary_list.json")
+                if os.path.exists(summary_file):
+                    files_to_copy.append(summary_file)
                 for path in files_to_copy:
                     try:
                         self.copyit(path, ddir, tag, vehicle)
