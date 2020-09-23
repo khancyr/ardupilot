@@ -67,7 +67,7 @@ def text(label, text=''):
             label
         ))
 
-def print_table(summary_data_list, header):
+def print_table(summary_data_list, header, diff=False, summary_data_list_master=None):
     max_widths = []
     table = [[] for _ in range(len(summary_data_list))]
 
@@ -77,7 +77,13 @@ def print_table(summary_data_list, header):
         header_row.append(txt)
         max_width = len(txt)
         for i, row_data in enumerate(summary_data_list):
-            txt = str(row_data.get(h, '-'))
+            if diff and h not in ["target"]:
+                txt = str(row_data.get(h, '-'))
+                master_data = summary_data_list_master[i][h]
+                diff_master = (master_data - int(txt)) * 100 / master_data
+                txt = txt + " (%.2f%%)" % diff_master
+            else:
+                txt = str(row_data.get(h, '-'))
             table[i].append(txt)
 
             w = len(txt)
