@@ -149,6 +149,21 @@ def _build_summary(bld):
 
         summary_data_list = [tg.build_summary for tg in taskgens]
         print_table(summary_data_list, bld.env.BUILD_SUMMARY_HEADER)
+        if bld.options.summary_save:
+            summary_file_name = "build_summary_list.json"
+            path_to_binary = summary_data_list[0]["binary"].rsplit('/', 2)[0] + "/"
+            print("save summary to : %s" % (path_to_binary + summary_file_name))
+            import os
+            import errno
+            try:
+                os.makedirs(path_to_binary)
+            except OSError as exception:
+                if exception.errno != errno.EEXIST:
+                    raise
+            with open(path_to_binary + summary_file_name, "w") as summary_file:
+                import json
+                summary_data_json = json.dumps(summary_data_list)
+                summary_file.write(summary_data_json)
 
         if targets_suppressed:
             Logs.info('')
@@ -212,6 +227,9 @@ def options(opt):
         help='''Print build summary for all targets. By default, only
 information about the first %d targets will be printed.
 ''' % MAX_TARGETS)
+    g.add_option('--summary-save',
+                 action='store_true',
+                 help='''Save build summary for all targets to file.''')
 
 def configure(cfg):
     size_name = 'size'
