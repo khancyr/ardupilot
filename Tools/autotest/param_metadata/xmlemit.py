@@ -47,7 +47,7 @@ class XmlEmit(Emit):
                 t += INDENT6 + '<param name=%s' % quoteattr(param.name)
 
             if hasattr(param, 'Description'):
-                t += ' documentation=%s' % quoteattr(param.Description)  # i.e. parameter docs
+                t += ' documentation=%s' % quoteattr(param.Description, {'"': "&quot;"})  # i.e. parameter docs
             if hasattr(param, 'User'):
                 t += ' user=%s' % quoteattr(param.User)  # i.e. Standard or Advanced
 
