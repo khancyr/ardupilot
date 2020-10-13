@@ -4,6 +4,7 @@ from xml.sax.saxutils import escape, quoteattr
 
 from emit import Emit
 from param import known_param_fields, known_units
+from xmlvalidator import XmlValidator
 
 INDENT2 = "  "
 INDENT4 = "    "
@@ -28,6 +29,8 @@ class XmlEmit(Emit):
         self.f.write(INDENT2 + '</libraries>\n')
         self.f.write('''</paramfile>\n''')
         self.f.close()
+        xml_validator = XmlValidator(self.wiki_fname)
+        xml_validator.output_validation()
 
     def emit_comment(self, s):
         self.f.write("<!-- " + s + " -->")
