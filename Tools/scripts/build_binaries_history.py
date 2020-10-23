@@ -7,9 +7,10 @@ import sqlite3
 
 
 class BuildBinariesHistory():
-    def __init__(self, db_filepath):
+    def __init__(self, db_filepath, json_filepath=None):
         self.db_filepath = db_filepath
         self.assure_db_present()
+        self.json_filepath = json_filepath
 
     def progress(self, msg):
         print("BBHIST: %s" % msg)
@@ -79,6 +80,12 @@ class BuildBinariesHistory():
                   "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                   (hash, tag, vehicle, board, frame, text, data, bss, start_time, duration))
         c.commit()
+        if self.json_filepath is not None:
+            with open(self.json_filepath, "rw") as summary_json:
+                import json
+                summary_data_json = json.dumps(summary_data_list)
+                summary_json.write(summary_data_json)
+        # {board: { vehicle-frame: { text: a, data: b, bss: c, duration: d }}}
 
     def record_run(self, hash, tag, start_time, duration):
         c = self.conn()
