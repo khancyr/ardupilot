@@ -158,7 +158,9 @@ def _build_summary(bld):
         if bld.options.summary_save:
             summary_file_name = "build_summary_list.json"
             path_to_binary = summary_data_list[0]["binary"].rsplit('/', 2)[0] + "/"
-            print("save summary to : %s" % (path_to_binary + summary_file_name))
+            Logs.info('')
+            text('SAVING SUMMARY')
+            text("Save summary to : ", path_to_binary + summary_file_name)
             import os
             import errno
             try:
