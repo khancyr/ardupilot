@@ -12,7 +12,7 @@ data = 5678
 
 vehicle2 = "rover"
 frame2 = None
-board2 = "testboard"
+board2 = "testboard2"
 text2 = 91234
 data2 = 95678
 
@@ -25,21 +25,21 @@ vehicle3 = "plae"
 # }
 # ]
 summary_data_list = [{
-    board: {vehicle : {"text" : text, "data" : data}},
+    board2: {vehicle : {"text" : text, "data" : data}},
 }
 ]
 
 summary_data_list2 = [{
-    board2: {vehicle3 : {"text" : text2, "data" : data2}},
+    board: {vehicle3 : {"text" : text2, "data" : data2}},
 }
 ]
 
 summary_data_list3 = [{
-    "testbpard3": {vehicle3 : {"text" : text2, "data" : data2}},
+    "testbpard3": {vehicle2 : {"text" : text2, "data" : data2}},
 }
 ]
 
-test_list = summary_data_list2
+test_list = summary_data_list
 
 print("prout")
 # check file exist to prevent json failure
