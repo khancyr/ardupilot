@@ -11,6 +11,8 @@ class BuildBinariesHistory():
         self.db_filepath = db_filepath
         self.assure_db_present()
         self.json_filepath = json_filepath
+        if os.path.isfile(self.json_filepath):
+            os.remove(self.json_filepath)
 
     def progress(self, msg):
         print("BBHIST: %s" % msg)
@@ -80,12 +82,39 @@ class BuildBinariesHistory():
                   "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                   (hash, tag, vehicle, board, frame, text, data, bss, start_time, duration))
         c.commit()
+        if frame is not None:
+            vehicle = vehicle + "-" + frame
+        build_json = [{
+            board: {vehicle: {"text": text, "data": data, "bss": bss, "duration": duration}},
+        }]
         if self.json_filepath is not None:
-            with open(self.json_filepath, "rw") as summary_json:
-                import json
-                summary_data_json = json.dumps(summary_data_list)
-                summary_json.write(summary_data_json)
-        # {board: { vehicle-frame: { text: a, data: b, bss: c, duration: d }}}
+            import json
+            # check file exist to prevent json failure
+            if os.path.isfile(self.json_filepath):
+                main_data_summary = None
+                # json util needs to open the file at start to parse it !
+                with open(self.json_filepath, "r+") as summary_json:
+                    main_data_summary = json.load(summary_json)
+                    # keys are the boards
+                    key = next(iter(build_json[0]))
+                    # We check if we already have some vehicle build data for the board
+                    if key in main_data_summary[0]:
+                        # update the board with a new vehicle data
+                        main_data_summary[0][key].update(build_json[0][key])
+                    else:
+                        # add the new board with the vehicle data
+                        main_data_summary[0].update(build_json[0])
+
+                with open(self.json_filepath, "w") as summary_json:
+                    # rewrite the json file
+                    summary_data_json = json.dumps(main_data_summary)
+                    summary_json.write(summary_data_json)
+            else:
+                # open as a to create the file
+                with open(self.json_filepath, "a") as summary_json:
+                    # write the full file
+                    summary_data_json = json.dumps(build_json)
+                    summary_json.write(summary_data_json)
 
     def record_run(self, hash, tag, start_time, duration):
         c = self.conn()

@@ -35,7 +35,9 @@ class build_binaries(object):
         self.dirty = False
         binaries_history_filepath = os.path.join(self.buildlogs_dirpath(),
                                                  "build_binaries_history.sqlite")
-        self.history = build_binaries_history.BuildBinariesHistory(binaries_history_filepath)
+        binaries_json_filepath = os.path.join(self.buildlogs_dirpath(),
+                                              "firmware_sizes.json")
+        self.history = build_binaries_history.BuildBinariesHistory(binaries_history_filepath, binaries_json_filepath)
 
     def progress(self, string):
         '''pretty-print progress'''
