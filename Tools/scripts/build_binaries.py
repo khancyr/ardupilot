@@ -452,11 +452,6 @@ is bob we will attempt to checkout bob-AVR'''
                 if len(files_to_copy) == 0:
                     files_to_copy.append(bare_path)
 
-                summary_file = os.path.join(self.buildroot,
-                                            board,
-                                            "build_summary_list.json")
-                if os.path.exists(summary_file):
-                    files_to_copy.append(summary_file)
                 for path in files_to_copy:
                     try:
                         self.copyit(path, ddir, tag, vehicle)
