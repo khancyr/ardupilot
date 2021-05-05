@@ -20,6 +20,7 @@ class CoverageRunner(object):
         self.INFO_FILE_BASE = os.path.join(root_dir, self.REPORT_DIR, "lcov_base.info")
         self.LCOV_LOG = os.path.join(root_dir, "GCOV_lcov.log")
         self.GENHTML_LOG = os.path.join(root_dir, "GCOV_genhtml.log")
+        self.CI = os.environ.get("CI", False)
 
     def progress(self, string):
         """ Pretty printer."""
@@ -37,7 +38,7 @@ class CoverageRunner(object):
             print("Error: %s : %s" % (self.REPORT_DIR, e.strerror))
 
         try:
-            os.mkdir(self.REPORT_DIR)
+            os.makedirs(self.REPORT_DIR)
         except OSError as error:
             print(error)
 
@@ -61,14 +62,15 @@ class CoverageRunner(object):
                                      "--directory", root_dir,
                                      "-o", self.INFO_FILE_BASE,
                                      ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-            print(result.stdout)
+            if not self.CI:
+                print(result.stdout)
             with open(self.LCOV_LOG, 'w') as log_file:
                 log_file.write(result.stdout)
         except subprocess.CalledProcessError as err:
             print("ERROR :")
             print(err.cmd)
             print(err.output)
-            exit(0)
+            exit(1)
         self.progress("Initialization done !")
 
     def check_build(self, name, path):
@@ -112,7 +114,7 @@ class CoverageRunner(object):
             print("ERROR :")
             print(err.cmd)
             print(err.output)
-            exit(0)
+            exit(1)
         self.progress("Build examples and vehicle binaries done !")
 
     def run_full(self):
@@ -124,28 +126,27 @@ class CoverageRunner(object):
         SPEEDUP = 5
         TIMEOUT = 14400
         autotest = os.path.join(root_dir, "Tools/autotest/autotest.py")
-        try:
-            self.progress("Running run.examples")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "--speedup=" + str(SPEEDUP), "run.examples"], check=True)
-            self.progress("Running run.unit_tests")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.unit_tests", "run.unit_tests"], check=True)
-            self.progress("Running test.Plane and test.QuadPlane")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Plane", "test.Plane", "test.QuadPlane"], check=True)
-            self.progress("Running test.Sub")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Sub", "test.Sub"], check=True)
-            self.progress("Running test.Copter")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Copter", "test.Copter"], check=True)
-            self.progress("Running test.Helicopter")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Helicopter", "test.Helicopter"], check=True)
-            self.progress("Running test.Tracker")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Tracker", "test.Tracker"], check=True)
-            self.progress("Running test.Rover")
-            subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Rover", "test.Rover"], check=True)
-        except subprocess.CalledProcessError as err:
-            print("ERROR :")
-            print(err.cmd)
-            print(err.output)
-            exit(1)
+
+        self.progress("Running run.examples")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "--speedup=" + str(SPEEDUP),
+                        "run.examples"])
+        self.progress("Running run.unit_tests")
+        subprocess.run(
+            [autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.unit_tests", "run.unit_tests"])
+        self.progress("Running test.Plane and test.QuadPlane")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Plane", "test.Plane", "test.QuadPlane"])
+        self.progress("Running test.Sub")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Sub", "test.Sub"])
+        self.progress("Running test.Copter")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Copter", "test.Copter"])
+        self.progress("Running test.Helicopter")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Helicopter", "test.Helicopter"])
+        self.progress("Running test.Tracker")
+        subprocess.run(
+            [autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Tracker", "test.Tracker"])
+        self.progress("Running test.Rover")
+        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Rover", "test.Rover"])
+
         # TODO add any other execution path/s we can to maximise the actually
         # used code, can we run other tests or things?  Replay, perhaps?
         self.update_stats()
@@ -153,68 +154,75 @@ class CoverageRunner(object):
     def update_stats(self):
         self.progress("Generating Coverage statistics")
         with open(self.LCOV_LOG, 'a') as log_file:
-            try:
-                result = subprocess.run(["lcov", "--no-external", "--capture",
-                                         "--directory", root_dir,
-                                         "-o", self.INFO_FILE,
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                subprocess.run(["lcov", "--add-tracefile", self.INFO_FILE_BASE,
-                                "--add-tracefile", self.INFO_FILE,
-                                ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
+            # we cannot use subprocess.PIPE and result.stdout to get the output as it will be too long and trigger
+            # BlockingIOError: [Errno 11] write could not complete without blocking
+            # thus we ouput to temp file, and print the file line by line...
+            with open("tmp_file", 'w+') as tmp_file:
+                try:
+                    subprocess.run(["lcov", "--no-external", "--capture",
+                                    "--directory", root_dir,
+                                    "-o", self.INFO_FILE,
+                                    ], stdout=tmp_file, stderr=subprocess.STDOUT, text=True, check=True)
+                    if not self.CI:
+                        tmp_file.seek(0)
+                        content = tmp_file.read().splitlines()
+                        for line in content:
+                            print(line)
+                            log_file.write(line)
+                        tmp_file.seek(0)
 
-                # remove files we do not intentionally test:
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         ".waf*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         root_dir + "/modules/gtest/*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         root_dir + "/modules/uavcan/*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         root_dir + "/build/linux/libraries/*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         root_dir + "/build/sitl/libraries/*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-                result = subprocess.run(["lcov", "--remove", self.INFO_FILE,
-                                         root_dir + "/build/sitl/modules/*", "-o", self.INFO_FILE
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
+                    subprocess.run(["lcov", "--add-tracefile", self.INFO_FILE_BASE,
+                                    "--add-tracefile", self.INFO_FILE,
+                                    ], stdout=tmp_file, stderr=subprocess.STDOUT, text=True, check=True)
+                    if not self.CI:
+                        tmp_file.seek(0)
+                        content = tmp_file.read().splitlines()
+                        for line in content:
+                            # print(line)  # not usefull to print
+                            log_file.write(line)
+                        tmp_file.seek(0)
+
+                    # remove files we do not intentionally test:
+                    subprocess.run(["lcov", "--remove", self.INFO_FILE,
+                                    ".waf*",
+                                    root_dir + "/modules/gtest/*",
+                                    root_dir + "/modules/uavcan/*",
+                                    root_dir + "/build/linux/libraries/*",
+                                    root_dir + "/build/sitl/libraries/*",
+                                    root_dir + "/build/sitl/modules/*",
+                                    "-o", self.INFO_FILE
+                                    ], stdout=tmp_file, stderr=subprocess.STDOUT, text=True, check=True)
+                    if not self.CI:
+                        tmp_file.seek(0)
+                        content = tmp_file.read().splitlines()
+                        for line in content:
+                            # print(line)  # not usefull to print
+                            log_file.write(line)
+                        tmp_file.seek(0)
+
+                except subprocess.CalledProcessError as err:
+                    print("ERROR :")
+                    print(err.cmd)
+                    print(err.output)
+                    os.remove("tmp_file")
+                    sys.exit(1)
+            os.remove("tmp_file")
+
+        with open(self.GENHTML_LOG, 'w+') as log_file:
+            try:
+                subprocess.run(["genhtml", self.INFO_FILE,
+                                "-o", self.REPORT_DIR,
+                                ], stdout=log_file, stderr=subprocess.STDOUT, text=True, check=True)
+                if not self.CI:
+                    log_file.seek(0)
+                    content = log_file.read().splitlines()
+                    for line in content:
+                        print(line)
             except subprocess.CalledProcessError as err:
                 print("ERROR :")
                 print(err.cmd)
                 print(err.output)
-                exit(0)
-
-        with open(self.GENHTML_LOG, 'w') as log_file:
-            try:
-                result = subprocess.run(["genhtml", self.INFO_FILE,
-                                         "-o", self.REPORT_DIR,
-                                         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
-                print(result.stdout)
-                log_file.write(result.stdout)
-            except subprocess.CalledProcessError as err:
-                print("ERROR :")
-                print(err.cmd)
-                print(err.output)
-                exit(0)
+                exit(1)
         self.progress("Coverage successful. Open " + self.REPORT_DIR + "/index.html")
 
 
@@ -235,15 +243,15 @@ if __name__ == '__main__':
     runner = CoverageRunner()
     if args.init:
         runner.init_coverage()
-        sys.exit(1)
+        sys.exit(0)
     if args.full:
         runner.run_full()
-        sys.exit(1)
+        sys.exit(0)
     if args.build:
         runner.run_build()
-        sys.exit(1)
+        sys.exit(0)
     if args.update:
         runner.update_stats()
-        sys.exit(1)
+        sys.exit(0)
     parser.print_help()
-    sys.exit(1)
+    sys.exit(0)
