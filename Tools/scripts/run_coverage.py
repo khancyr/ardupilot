@@ -2,6 +2,8 @@
 
 """
 Runs tests with gcov coverage support.
+
+ AP_FLAKE8_CLEAN
 """
 import argparse
 import os
@@ -9,12 +11,17 @@ import shutil
 import subprocess
 import sys
 
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 tools_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.realpath(os.path.join(tools_dir, '../..'))
 
 
 class CoverageRunner(object):
+    """Coverage Runner Class."""
+
     def __init__(self):
+        """Set the files Path."""
         self.REPORT_DIR = os.path.join(root_dir, "reports/lcov-report")
         self.INFO_FILE = os.path.join(root_dir, self.REPORT_DIR, "lcov.info")
         self.INFO_FILE_BASE = os.path.join(root_dir, self.REPORT_DIR, "lcov_base.info")
@@ -23,46 +30,51 @@ class CoverageRunner(object):
         self.CI = os.environ.get("CI", False)
 
     def progress(self, string):
-        """ Pretty printer."""
+        """Pretty printer."""
         print("****** %s" % (string,))
 
     def init_coverage(self):
-        """ Initialize ArduPilot for coverage.
-        This need to be run with the binaries builded.
+        """Initialize ArduPilot for coverage.
+
+        This need to be run with the binaries built.
         """
-        self.progress("Initilizing Coverage...")
+        self.progress("Initializing Coverage...")
         self.progress("Removing previous reports")
         try:
             shutil.rmtree(self.REPORT_DIR)
-        except OSError as e:
-            print("Error: %s : %s" % (self.REPORT_DIR, e.strerror))
+        except FileNotFoundError:
+            pass
 
         try:
             os.makedirs(self.REPORT_DIR)
-        except OSError as error:
-            print(error)
+        except FileExistsError:
+            pass
 
         self.progress("Checking that vehicles binaries are set up and built")
         examples_dir = os.path.join(root_dir, 'build/linux/examples')
         binaries_dir = os.path.join(root_dir, 'build/sitl/bin')
-        is_build_correct = self.check_build("example", examples_dir) and self.check_build("binaries", binaries_dir)
-        if not is_build_correct:
+        if not (self.check_build("example", examples_dir) and self.check_build("binaries", binaries_dir)):
             self.run_build()
 
         self.progress("Zeroing previous build")
         retcode = subprocess.call(["lcov", "--zerocounters", "--directory", root_dir])
         if retcode != 0:
             self.progress("Failed with retcode (%s)" % retcode)
+            exit(1)
 
         self.progress("Initializing Coverage with current build")
         try:
-            result = subprocess.run(["lcov", "--no-external", "--initial", "--capture",
-                                     "--exclude", "\"" + root_dir + "/modules/uavcan/*\"",
-                                     "--exclude", "\"" + root_dir + "/build/sitl/modules/*\"",
+            result = subprocess.run(["lcov",
+                                     "--no-external",
+                                     "--initial",
+                                     "--capture",
+                                     "--exclude", root_dir + "/modules/uavcan/*",
+                                     "--exclude", root_dir + "/build/sitl/modules/*",
                                      "--directory", root_dir,
                                      "-o", self.INFO_FILE_BASE,
                                      ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=True)
             if not self.CI:
+                print(*result.args)
                 print(result.stdout)
             with open(self.LCOV_LOG, 'w') as log_file:
                 log_file.write(result.stdout)
@@ -74,6 +86,7 @@ class CoverageRunner(object):
         self.progress("Initialization done !")
 
     def check_build(self, name, path):
+        """Check that build directory is not empty and that binaries are built with the coverage flags."""
         self.progress("Checking that %s are set up and built" % name)
         if os.path.exists(path):
             if not os.listdir(path):
@@ -81,17 +94,15 @@ class CoverageRunner(object):
         else:
             return False
         self.progress("Checking %s build configuration for coverage" % name)
-        with open(path + "/../compile_commands.json", "r") as searchfile:
+        with open(os.path.join(path, "../compile_commands.json"), "r") as searchfile:
             for line in searchfile:
                 if "-ftest-coverage" in line:
                     return True
-                else:
-                    continue
-            print("%s weren't build with coverage support" % name)
+            self.progress("%s was't built with coverage support" % name)
             return False
 
     def run_build(self):
-        """ Clean the build directory and build binaries for coverage."""
+        """Clean the build directory and build binaries for coverage."""
         os.environ["CCFLAGS"] = os.environ.get("CCFLAGS", "") + " -fprofile-arcs -ftest-coverage"
         os.environ["CXXFLAGS"] = os.environ.get("CXXFLAGS", "") + " -fprofile-arcs -ftest-coverage"
         os.environ["LINKFLAGS"] = os.environ.get("LINKFLAGS", "") + " -lgcov -coverage"
@@ -99,8 +110,8 @@ class CoverageRunner(object):
         self.progress("Removing previous build binaries")
         try:
             shutil.rmtree(os.path.join(root_dir, "build"))
-        except OSError as e:
-            print("Error: %s : %s" % (self.REPORT_DIR, e.strerror))
+        except FileNotFoundError:
+            pass
 
         self.progress("Building examples and SITL binaries")
         os.chdir(root_dir)
@@ -118,7 +129,7 @@ class CoverageRunner(object):
         self.progress("Build examples and vehicle binaries done !")
 
     def run_full(self):
-        """ Run full coverage on maximum of ArduPilot binaries and test functions."""
+        """Run full coverage on maximum of ArduPilot binaries and test functions."""
         self.progress("Running full test suite...")
         self.run_build()
         self.init_coverage()
@@ -128,30 +139,41 @@ class CoverageRunner(object):
         autotest = os.path.join(root_dir, "Tools/autotest/autotest.py")
 
         self.progress("Running run.examples")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "--speedup=" + str(SPEEDUP),
-                        "run.examples"])
+        subprocess.run([autotest,
+                        "--timeout=" + str(TIMEOUT),
+                        "--debug",
+                        "--no-clean",
+                        "--speedup=" + str(SPEEDUP),
+                        "run.examples"
+                        ])
         self.progress("Running run.unit_tests")
         subprocess.run(
-            [autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.unit_tests", "run.unit_tests"])
-        self.progress("Running test.Plane and test.QuadPlane")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Plane", "test.Plane", "test.QuadPlane"])
-        self.progress("Running test.Sub")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Sub", "test.Sub"])
-        self.progress("Running test.Copter")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Copter", "test.Copter"])
-        self.progress("Running test.Helicopter")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Helicopter", "test.Helicopter"])
-        self.progress("Running test.Tracker")
-        subprocess.run(
-            [autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Tracker", "test.Tracker"])
-        self.progress("Running test.Rover")
-        subprocess.run([autotest, "--timeout=" + str(TIMEOUT), "--debug", "--no-clean", "build.Rover", "test.Rover"])
+            [autotest,
+             "--timeout=" + str(TIMEOUT),
+             "--debug",
+             "--no-clean",
+             "build.unit_tests",
+             "run.unit_tests"])
+        test_list = ["Plane", "QuadPlane", "Sub", "Copter", "Helicopter", "Rover", "Tracker"]
+        for test in test_list:
+            self.progress("Running test.%s" % test)
+            subprocess.run([autotest,
+                            "--timeout=" + str(TIMEOUT),
+                            "--debug",
+                            "--no-clean",
+                            "build.%s" % test,
+                            "test.%s" % test,
+                            ])
 
         # TODO add any other execution path/s we can to maximise the actually
         # used code, can we run other tests or things?  Replay, perhaps?
         self.update_stats()
 
     def update_stats(self):
+        """Update Coverage statistics only.
+
+        Assumes that coverage tests have been run.
+        """
         self.progress("Generating Coverage statistics")
         with open(self.LCOV_LOG, 'a') as log_file:
             # we cannot use subprocess.PIPE and result.stdout to get the output as it will be too long and trigger
@@ -159,7 +181,9 @@ class CoverageRunner(object):
             # thus we ouput to temp file, and print the file line by line...
             with open("tmp_file", 'w+') as tmp_file:
                 try:
-                    subprocess.run(["lcov", "--no-external", "--capture",
+                    subprocess.run(["lcov",
+                                    "--no-external",
+                                    "--capture",
                                     "--directory", root_dir,
                                     "-o", self.INFO_FILE,
                                     ], stdout=tmp_file, stderr=subprocess.STDOUT, text=True, check=True)
@@ -171,7 +195,8 @@ class CoverageRunner(object):
                             log_file.write(line)
                         tmp_file.seek(0)
 
-                    subprocess.run(["lcov", "--add-tracefile", self.INFO_FILE_BASE,
+                    subprocess.run(["lcov",
+                                    "--add-tracefile", self.INFO_FILE_BASE,
                                     "--add-tracefile", self.INFO_FILE,
                                     ], stdout=tmp_file, stderr=subprocess.STDOUT, text=True, check=True)
                     if not self.CI:
@@ -183,7 +208,8 @@ class CoverageRunner(object):
                         tmp_file.seek(0)
 
                     # remove files we do not intentionally test:
-                    subprocess.run(["lcov", "--remove", self.INFO_FILE,
+                    subprocess.run(["lcov",
+                                    "--remove", self.INFO_FILE,
                                     ".waf*",
                                     root_dir + "/modules/gtest/*",
                                     root_dir + "/modules/uavcan/*",
