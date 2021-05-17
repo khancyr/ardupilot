@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 Runs tests with gcov coverage support.
@@ -36,7 +36,7 @@ class CoverageRunner(object):
     def init_coverage(self):
         """Initialize ArduPilot for coverage.
 
-        This need to be run with the binaries built.
+        This needs to be run with the binaries built.
         """
         self.progress("Initializing Coverage...")
         self.progress("Removing previous reports")
@@ -83,7 +83,7 @@ class CoverageRunner(object):
             print(err.cmd)
             print(err.output)
             exit(1)
-        self.progress("Initialization done !")
+        self.progress("Initialization done")
 
     def check_build(self, name, path):
         """Check that build directory is not empty and that binaries are built with the coverage flags."""
@@ -191,7 +191,7 @@ class CoverageRunner(object):
                         tmp_file.seek(0)
                         content = tmp_file.read().splitlines()
                         for line in content:
-                            print(line)
+                            print(line, flush=True)
                             log_file.write(line)
                         tmp_file.seek(0)
 
@@ -243,7 +243,7 @@ class CoverageRunner(object):
                     log_file.seek(0)
                     content = log_file.read().splitlines()
                     for line in content:
-                        print(line)
+                        print(line, flush=True)
             except subprocess.CalledProcessError as err:
                 print("ERROR :")
                 print(err.cmd)
