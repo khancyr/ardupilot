@@ -299,6 +299,46 @@ TEST(MathWrapTest, Angle360)
     EXPECT_EQ(0,     wrap_360((int16_t)720));
     EXPECT_EQ(0,     wrap_360((int16_t)3600));
     EXPECT_EQ(0,     wrap_360((int16_t)7200));
+    EXPECT_EQ(0,     wrap_360((int16_t)-360));
+}
+
+TEST(MathWrapTest, Angle360Double)
+{
+// Full circle test
+    for (int32_t i = 0; i <= 36000; i += 100) {
+        if (i == 0) {
+            // hit pole position
+            EXPECT_EQ(i, wrap_360_cd(i));
+            EXPECT_EQ(i, wrap_360_cd(-i));
+        } else if (i < 36000) {
+            // between pole position
+            EXPECT_EQ(i, wrap_360_cd(i));
+            EXPECT_EQ(36000 - i, wrap_360_cd(-i));
+        } else if (i == 36000) {
+            // hit pole position
+            EXPECT_EQ(0, wrap_360_cd(i));
+            EXPECT_EQ(0, wrap_360_cd(-i));
+        }
+    }
+
+    EXPECT_EQ(4500.0,  wrap_360_cd(static_cast<double>(4500.0)));
+    EXPECT_EQ(9000.0,  wrap_360_cd(static_cast<double>(9000.0)));
+    EXPECT_EQ(18000.0, wrap_360_cd(static_cast<double>(18000.0)));
+    EXPECT_EQ(27000.0, wrap_360_cd(static_cast<double>(27000.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(36000.0)));
+    EXPECT_EQ(5.0,     wrap_360_cd(static_cast<double>(36005.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(72000.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(360000.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(720000.0)));
+    EXPECT_EQ( 0.0,    wrap_360_cd(static_cast<double>(-3600000000.0)));
+
+    EXPECT_EQ(31500.0, wrap_360_cd(static_cast<double>(-4500.0)));
+    EXPECT_EQ(27000.0, wrap_360_cd(static_cast<double>(-9000.0)));
+    EXPECT_EQ(18000.0, wrap_360_cd(static_cast<double>(-18000.0)));
+    EXPECT_EQ(9000.0,  wrap_360_cd(static_cast<double>(-27000.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(-36000.0)));
+    EXPECT_EQ(35995.0,wrap_360_cd(static_cast<double>(-36005.0)));
+    EXPECT_EQ(0.0,     wrap_360_cd(static_cast<double>(-72000.0)));
 }
 
 TEST(MathWrapTest, AnglePI)
@@ -322,6 +362,73 @@ TEST(MathWrapTest, Angle2PI)
     EXPECT_NEAR(0,    wrap_2PI(-M_2PI), accuracy);
 }
 
+TEST(MathTest, ASin)
+{
+    const float accuracy = 1.0e-5;
+    EXPECT_NEAR(0.0f, safe_asin(0.0f), accuracy);
+    EXPECT_NEAR(0.9033391107665127f, safe_asin(M_PI_2 * 0.5f), accuracy);
+    EXPECT_NEAR(M_PI_2, safe_asin(M_PI_2 ), accuracy);
+    EXPECT_NEAR(M_PI_2, safe_asin(M_PI), accuracy);
+    EXPECT_NEAR(M_PI_2, safe_asin(M_2PI), accuracy);
+    EXPECT_NEAR(-M_PI_2, safe_asin(-M_PI_2), accuracy);
+    EXPECT_NEAR(-M_PI_2, safe_asin(-M_PI), accuracy);
+    EXPECT_NEAR(-0.9033391107665127f, safe_asin(-M_PI_2 * 0.5f), accuracy);
+    EXPECT_NEAR(0.0f, safe_asin(nan("0x4152445550490a")), accuracy);
+}
+
+TEST(MathTest, Squrt)
+{
+    const float accuracy = 1.0e-5;
+    EXPECT_NEAR(0.0f, safe_sqrt(0.0f), accuracy);
+    EXPECT_NEAR(32.0f, safe_sqrt(1024.0f), accuracy);
+    EXPECT_NEAR(0.0f, safe_sqrt(-1.0f), accuracy);
+
+    EXPECT_NEAR(0.0f, safe_sqrt(nan("0x4152445550490a")), accuracy);
+
+}
+
+TEST(MathTest, Interpolation)
+{
+    const float accuracy = 1.0e-5;
+    EXPECT_NEAR(1500.0f, linear_interpolate(1200.0f, 1800.0f, 1500.0f, 1000.0f, 2000.0f), accuracy);
+    EXPECT_NEAR(1740.0f, linear_interpolate(1200.0f, 1800.0f, 1900.0f, 1000.0f, 2000.0f), accuracy);
+    EXPECT_NEAR(1200.0f, linear_interpolate(1200.0f, 1800.0f, 1000.0f, 1000.0f, 2000.0f), accuracy);
+    EXPECT_NEAR(1000.0f, linear_interpolate(1000.0f, 2000.0f, 1100.0f, 1200.0f, 1800.0f), accuracy);
+
+}
+
+TEST(MathTest, ThrottleCurve)
+{
+    // get hover throttle level [0,1]
+    static constexpr float THR_MID = 0.5f;
+
+    const float accuracy = 1.0e-5;
+    EXPECT_NEAR(0.0f, throttle_curve(THR_MID, 0.0f, 0.0f), accuracy);
+    EXPECT_NEAR(0.25f, throttle_curve(THR_MID, 0.0f, 0.25f), accuracy);
+    EXPECT_NEAR(0.5f, throttle_curve(THR_MID, 0.0f, 0.5f), accuracy);
+    EXPECT_NEAR(0.75f, throttle_curve(THR_MID, 0.0f, 0.75f), accuracy);
+    EXPECT_NEAR(1.0f, throttle_curve(THR_MID, 0.0f, 1.0f), accuracy);
+    EXPECT_NEAR(0.0f, throttle_curve(THR_MID, 0.25f, 0.0f), accuracy);
+    EXPECT_NEAR(0.296875f, throttle_curve(THR_MID, 0.25f, 0.25f), accuracy);
+    EXPECT_NEAR(0.5f, throttle_curve(THR_MID, 0.25f, 0.5f), accuracy);
+    EXPECT_NEAR(0.703125f, throttle_curve(THR_MID, 0.25f, 0.75f), accuracy);
+    EXPECT_NEAR(1.0f, throttle_curve(THR_MID, 0.25f, 1.0f), accuracy);
+    EXPECT_NEAR(0.0f, throttle_curve(THR_MID, 0.5f, 0.0f), accuracy);
+    EXPECT_NEAR(0.34375f, throttle_curve(THR_MID, 0.5f, 0.25f), accuracy);
+    EXPECT_NEAR(0.5f, throttle_curve(THR_MID, 0.5f, 0.5f), accuracy);
+    EXPECT_NEAR(0.65625f, throttle_curve(THR_MID, 0.5f, 0.75f), accuracy);
+    EXPECT_NEAR(1.0f, throttle_curve(THR_MID, 0.5f, 1.0f), accuracy);
+    EXPECT_NEAR(0.0f, throttle_curve(THR_MID, 0.75f, 0.0f), accuracy);
+    EXPECT_NEAR(0.390625f, throttle_curve(THR_MID, 0.75f, 0.25f), accuracy);
+    EXPECT_NEAR(0.5f, throttle_curve(THR_MID, 0.75f, 0.5f), accuracy);
+    EXPECT_NEAR(0.609375f, throttle_curve(THR_MID, 0.75f, 0.75f), accuracy);
+    EXPECT_NEAR(1.0f, throttle_curve(THR_MID, 0.75f, 1.0f), accuracy);
+    EXPECT_NEAR(0.0f, throttle_curve(THR_MID, 1.0f, 0.0f), accuracy);
+    EXPECT_NEAR(0.4375f, throttle_curve(THR_MID, 1.0f, 0.25f), accuracy);
+    EXPECT_NEAR(0.5f, throttle_curve(THR_MID, 1.0f, 0.5f), accuracy);
+    EXPECT_NEAR(0.5625f, throttle_curve(THR_MID, 1.0f, 0.75f), accuracy);
+    EXPECT_NEAR(1.0f, throttle_curve(THR_MID, 1.0f, 1.0f), accuracy);
+}
 AP_GTEST_MAIN()
 
 #pragma GCC diagnostic pop
