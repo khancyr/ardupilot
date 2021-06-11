@@ -101,7 +101,7 @@
 #endif
 
 #ifndef RANGEFINDER_WPNAV_FILT_HZ
- # define RANGEFINDER_WPNAV_FILT_HZ   0.25f // filter frequency for rangefinder altitude provided to waypoint navigation class
+ # define RANGEFINDER_WPNAV_FILT_HZ   0.5f // filter frequency for rangefinder altitude provided to waypoint navigation class
 #endif
 
 #ifndef RANGEFINDER_TILT_CORRECTION         // by disable tilt correction for use of range finder data by EKF
@@ -114,13 +114,6 @@
 
 #ifndef RANGEFINDER_GLITCH_NUM_SAMPLES
  # define RANGEFINDER_GLITCH_NUM_SAMPLES  3   // number of rangefinder glitches in a row to take new reading
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
-// Proximity sensor
-//
-#ifndef PROXIMITY_ENABLED
- # define PROXIMITY_ENABLED ENABLED
 #endif
 
 #ifndef MAV_SYSTEM_ID
@@ -375,6 +368,12 @@
 // Button - Enable the button connected to AUX1-6
 #ifndef BUTTON_ENABLED
  # define BUTTON_ENABLED ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Landing Gear support
+#ifndef LANDING_GEAR_ENABLED
+ #define LANDING_GEAR_ENABLED ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -679,9 +678,6 @@
  #define AC_OAPATHPLANNER_ENABLED   !HAL_MINIMIZE_FEATURES
 #endif
 
-#if AC_AVOID_ENABLED && !PROXIMITY_ENABLED
-  #error AC_Avoidance relies on PROXIMITY_ENABLED which is disabled
-#endif
 #if AC_AVOID_ENABLED && !AC_FENCE
   #error AC_Avoidance relies on AC_FENCE which is disabled
 #endif

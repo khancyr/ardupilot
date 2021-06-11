@@ -83,12 +83,27 @@ template float safe_sqrt<float>(const float v);
 template float safe_sqrt<double>(const double v);
 
 /*
+  replacement for std::swap() needed for STM32
+ */
+static void swap_float(float &f1, float &f2)
+{
+    float tmp = f1;
+    f1 = f2;
+    f2 = tmp;
+}
+
+/*
  * linear interpolation based on a variable in a range
  */
 float linear_interpolate(float low_output, float high_output,
                          float var_value,
                          float var_low, float var_high)
 {
+    if (var_low > var_high) {
+        // support either polarity
+        swap_float(var_low, var_high);
+        swap_float(low_output, high_output);
+    }
     if (var_value <= var_low) {
         return low_output;
     }
@@ -404,6 +419,18 @@ void fill_nanf(float *f, uint16_t count)
     }
 }
 #endif
+
+// Convert 16-bit fixed-point to float
+float fixed2float(const uint16_t input, const uint8_t fractional_bits)
+{
+    return ((float)input / (float)(1U << fractional_bits));
+}
+
+// Convert float to 16-bit fixed-point
+uint16_t float2fixed(const float input, const uint8_t fractional_bits)
+{
+    return (uint16_t)(roundf(input * (1U << fractional_bits)));
+}
 
 /*
   calculate turn rate in deg/sec given a bank angle and airspeed for a

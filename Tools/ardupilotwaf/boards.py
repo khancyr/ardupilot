@@ -164,6 +164,19 @@ class Board:
             env.DEFINES.update(
                 HAL_DEBUG_BUILD = 1,
             )
+        if cfg.env.COVERAGE:
+            env.CFLAGS += [
+                '-fprofile-arcs',
+                '-ftest-coverage',
+            ]
+            env.CXXFLAGS += [
+                '-fprofile-arcs',
+                '-ftest-coverage',
+            ]
+            env.LINKFLAGS += [
+                '-lgcov',
+                '-coverage',
+            ]
 
         if cfg.options.bootloader:
             # don't let bootloaders try and pull scripting in
@@ -544,7 +557,11 @@ class sitl_periph_gps(sitl):
             HAL_RAM_RESERVE_START = 0,
             APJ_BOARD_ID = 100,
             HAL_NO_GCS = 1,
-            HAL_NO_LOGGING = 1,
+            HAL_LOGGING_ENABLED = 0,
+            HAL_LOGGING_MAVLINK_ENABLED = 0,
+            HAL_MISSION_ENABLED = 0,
+            HAL_RALLY_ENABLED = 0,
+            HAL_SCHEDULER_ENABLED = 0,
         )
         # libcanard is written for 32bit platforms
         env.CXXFLAGS += [
@@ -618,7 +635,8 @@ class chibios(Board):
             '--specs=nosys.specs',
             '-DCHIBIOS_BOARD_NAME="%s"' % self.name,
             '-D__USE_CMSIS',
-            '-Werror=deprecated-declarations'
+            '-Werror=deprecated-declarations',
+            '-DNDEBUG=1'
         ]
         if not cfg.options.Werror:
             env.CFLAGS += [
@@ -690,6 +708,13 @@ class chibios(Board):
         else:
             cfg.msg("Enabling malloc guard", "no")
             
+        if cfg.env.ENABLE_STATS:
+            cfg.msg("Enabling ChibiOS thread statistics", "yes")
+            env.CFLAGS += [ '-DHAL_ENABLE_THREAD_STATISTICS' ]
+            env.CXXFLAGS += [ '-DHAL_ENABLE_THREAD_STATISTICS' ]
+        else:
+            cfg.msg("Enabling ChibiOS thread statistics", "no")
+
         env.LIB += ['gcc', 'm']
 
         env.GIT_SUBMODULES += [

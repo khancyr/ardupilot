@@ -302,12 +302,12 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
 //  Nav (Must) commands
 /********************************************************************************/
 
-void Plane::do_RTL(int32_t rtl_altitude)
+void Plane::do_RTL(int32_t rtl_altitude_AMSL_cm)
 {
     auto_state.next_wp_crosstrack = false;
     auto_state.crosstrack = false;
     prev_WP_loc = current_loc;
-    next_WP_loc = rally.calc_best_rally_or_home_location(current_loc, rtl_altitude);
+    next_WP_loc = rally.calc_best_rally_or_home_location(current_loc, rtl_altitude_AMSL_cm);
     setup_terrain_target_alt(next_WP_loc);
     set_target_altitude_location(next_WP_loc);
 
@@ -880,7 +880,7 @@ bool Plane::do_change_speed(const AP_Mission::Mission_Command& cmd)
     {
     case 0:             // Airspeed
         if ((cmd.content.speed.target_ms >= aparm.airspeed_min.get()) && (cmd.content.speed.target_ms <= aparm.airspeed_max.get()))  {
-            aparm.airspeed_cruise_cm.set(cmd.content.speed.target_ms * 100);
+           new_airspeed_cm = cmd.content.speed.target_ms * 100; //new airspeed target for AUTO or GUIDED modes
             gcs().send_text(MAV_SEVERITY_INFO, "Set airspeed %u m/s", (unsigned)cmd.content.speed.target_ms);
             return true;
         }
@@ -953,6 +953,18 @@ void Plane::exit_mission_callback()
 bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
 {
     switch (vtol_approach_s.approach_stage) {
+        case RTL:
+            {
+                // fly home and loiter at RTL alt
+                update_loiter(fabsf(quadplane.fw_land_approach_radius));
+                if (plane.reached_loiter_target()) {
+                    // decend to Q RTL alt
+                    plane.do_RTL(plane.home.alt + plane.quadplane.qrtl_alt*100UL);
+                    plane.loiter_angle_reset();
+                    vtol_approach_s.approach_stage = LOITER_TO_ALT;
+                }
+                break;
+            }
         case LOITER_TO_ALT:
             {
                 update_loiter(fabsf(quadplane.fw_land_approach_radius));

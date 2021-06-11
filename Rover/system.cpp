@@ -65,10 +65,13 @@ void Rover::init_ardupilot()
     AP::compass().init();
 
     // initialise rangefinder
+    rangefinder.set_log_rfnd_bit(MASK_LOG_RANGEFINDER);
     rangefinder.init(ROTATION_NONE);
 
+#if HAL_PROXIMITY_ENABLED
     // init proximity sensor
     g2.proximity.init();
+#endif
 
     // init beacons used for non-gps position estimation
     g2.beacon.init();
@@ -84,7 +87,7 @@ void Rover::init_ardupilot()
     ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
 
     init_rc_in();            // sets up rc channels deadzone
-    g2.motors.init();        // init motors including setting servo out channels ranges
+    g2.motors.init(get_frame_type());        // init motors including setting servo out channels ranges
     SRV_Channels::enable_aux_servos();
 
     // init wheel encoders

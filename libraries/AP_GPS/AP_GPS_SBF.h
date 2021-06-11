@@ -39,7 +39,7 @@ public:
 
     const char *name() const override { return "SBF"; }
 
-    bool is_configured (void) override;
+    bool is_configured (void) const override;
 
     void broadcast_configuration_failure_reason(void) const override;
 
@@ -54,6 +54,7 @@ public:
 
     bool prepare_for_arming(void) override;
 
+    bool get_error_codes(uint32_t &error_codes) const override { error_codes = RxError; return true; };
 
 private:
 
@@ -69,6 +70,7 @@ private:
         Baud_Rate,
         SSO,
         Blob,
+        SBAS,
         Complete
     };
     Config_State config_step;
@@ -82,6 +84,12 @@ private:
     GPS_SBF_EXTRA_CONFIG
 #endif
     };
+    static constexpr const char* sbas_off = "sst, -SBAS";
+    static constexpr const char* sbas_on_blob[] = {
+                                                   "snt,+GEOL1+GEOL5",
+                                                   "sst,+SBAS",
+                                                   "ssbc,auto,Operational,MixedSystems,auto",
+                                                  };
     uint32_t _config_last_ack_time;
 
     const char* _port_enable = "\nSSSSSSSSSS\n";

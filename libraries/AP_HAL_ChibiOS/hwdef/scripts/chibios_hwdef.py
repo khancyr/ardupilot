@@ -108,6 +108,9 @@ uart_serial_num = {}
 mcu_type = None
 dual_USB_enabled = False
 
+# list of device patterns that can't be shared
+dma_noshare = []
+
 def is_int(str):
     '''check if a string is an integer'''
     try:
@@ -615,10 +618,43 @@ def make_line(label):
     return line
 
 
-def enable_can(f, num_ifaces):
+def enable_can(f):
     '''setup for a CAN enabled board'''
-    f.write('#define HAL_NUM_CAN_IFACES %d\n' % num_ifaces)
-    env_vars['HAL_NUM_CAN_IFACES'] = str(num_ifaces)
+    global mcu_series
+    if mcu_series.startswith("STM32H7") or mcu_series.startswith("STM32G4"):
+        prefix = "FDCAN"
+        cast = "CanType"
+    else:
+        prefix = "CAN"
+        cast = "bxcan::CanType"
+
+    # allow for optional CAN_ORDER option giving bus order
+    can_order_str = get_config('CAN_ORDER', required=False, aslist=True)
+    if can_order_str:
+        can_order = [int(s) for s in can_order_str]
+    else:
+        can_order = []
+        for i in range(1,3):
+            if 'CAN%u' % i in bytype or (i == 1 and 'CAN' in bytype):
+                can_order.append(i)
+
+    base_list = []
+    for i in can_order:
+        base_list.append("reinterpret_cast<%s*>(uintptr_t(%s%s_BASE))" % (cast, prefix, i))
+        f.write("#define HAL_CAN_IFACE%u_ENABLE\n" % i)
+
+    can_rev_order = [-1]*3
+    for i in range(len(can_order)):
+        can_rev_order[can_order[i]-1] = i
+
+    f.write('#define HAL_CAN_INTERFACE_LIST %s\n' % ','.join([str(i-1) for i in can_order]))
+    f.write('#define HAL_CAN_INTERFACE_REV_LIST %s\n' % ','.join([str(i) for i in can_rev_order]))
+    f.write('#define HAL_CAN_BASE_LIST %s\n' % ','.join(base_list))
+    f.write('#define HAL_NUM_CAN_IFACES %d\n' % len(base_list))
+    global mcu_type
+    if 'CAN' in bytype and mcu_type.startswith("STM32F3"):
+        f.write('#define CAN1_BASE CAN_BASE\n')
+    env_vars['HAL_NUM_CAN_IFACES'] = str(len(base_list))
 
 
 def has_sdcard_spi():
@@ -710,10 +746,7 @@ def write_mcu_config(f):
             f.write('#define %s\n' % d[7:])
 
     if have_type_prefix('CAN') and not using_chibios_can:
-        if 'CAN1' in bytype and 'CAN2' in bytype:
-            enable_can(f, 2)
-        else:
-            enable_can(f, 1)
+        enable_can(f)
     flash_size = get_config('FLASH_SIZE_KB', type=int)
     f.write('#define BOARD_FLASH_SIZE %u\n' % flash_size)
     env_vars['BOARD_FLASH_SIZE'] = flash_size
@@ -746,7 +779,11 @@ def write_mcu_config(f):
         f.write('#define HAL_RAM_RESERVE_START 0x%08x\n' % ram_reserve_start)
 
     f.write('\n// CPU serial number (12 bytes)\n')
-    f.write('#define UDID_START 0x%08x\n\n' % get_mcu_config('UDID_START', True))
+    udid_start = get_mcu_config('UDID_START')
+    if udid_start is None:
+        f.write('#define UDID_START UID_BASE\n\n')
+    else:
+        f.write('#define UDID_START 0x%08x\n\n' % udid_start)
 
     f.write('\n// APJ board ID (for bootloaders)\n')
     f.write('#define APJ_BOARD_ID %s\n' % get_config('APJ_BOARD_ID'))
@@ -808,18 +845,12 @@ def write_mcu_config(f):
 #define CH_CFG_USE_WAITEXIT FALSE
 #define CH_CFG_USE_DYNAMIC FALSE
 #define CH_CFG_USE_MEMPOOLS FALSE
-#define CH_CFG_USE_OBJ_FIFOS FALSE
 #define CH_DBG_FILL_THREADS FALSE
 #define CH_CFG_USE_SEMAPHORES FALSE
 #define CH_CFG_USE_HEAP FALSE
 #define CH_CFG_USE_MUTEXES FALSE
-#define CH_CFG_USE_CONDVARS FALSE
-#define CH_CFG_USE_CONDVARS_TIMEOUT FALSE
 #define CH_CFG_USE_EVENTS FALSE
 #define CH_CFG_USE_EVENTS_TIMEOUT FALSE
-#define CH_CFG_USE_MESSAGES FALSE
-#define CH_CFG_USE_MAILBOXES FALSE
-#define CH_CFG_USE_FACTORY FALSE
 #define CH_CFG_USE_MEMCORE FALSE
 #define HAL_USE_I2C FALSE
 #define HAL_USE_PWM FALSE
@@ -1168,12 +1199,11 @@ def write_UART_config(f):
     devnames = "ABCDEFGHI"
     sdev = 0
     idx = 0
-    num_empty_uarts = 0
     for dev in uart_list:
         if dev == 'EMPTY':
             f.write('#define HAL_UART%s_DRIVER Empty::UARTDriver uart%sDriver\n' %
                     (devnames[idx], devnames[idx]))
-            num_empty_uarts += 1
+            sdev += 1
         else:
             f.write(
                 '#define HAL_UART%s_DRIVER ChibiOS::UARTDriver uart%sDriver(%u)\n'
@@ -1211,6 +1241,7 @@ def write_UART_config(f):
         elif dev.startswith('OTG'):
             n = int(dev[3:])
         elif dev.startswith('EMPTY'):
+            devlist.append('{}')
             continue
         else:
             error("Invalid element %s in UART_ORDER" % dev)
@@ -1276,7 +1307,7 @@ def write_UART_config(f):
         num_uarts -= 1
     if num_uarts > 9:
         error("Exceeded max num UARTs of 9 (%u)" % num_uarts)
-    f.write('#define HAL_UART_NUM_SERIAL_PORTS %u\n' % (num_uarts+num_empty_uarts))
+    f.write('#define HAL_UART_NUM_SERIAL_PORTS %u\n' % num_uarts)
 
 
 def write_UART_config_bootloader(f):
@@ -1753,6 +1784,8 @@ def write_hwdef_header(outfilename):
 
 ''')
 
+    dma_noshare.extend(get_config('DMA_NOSHARE', default='', aslist=True))
+
     write_mcu_config(f)
     write_SPI_config(f)
     write_ADC_config(f)
@@ -1761,13 +1794,14 @@ def write_hwdef_header(outfilename):
     write_MAG_config(f)
     write_BARO_config(f)
     write_board_validate_macro(f)
+    add_apperiph_defaults(f)
 
     write_peripheral_enable(f)
 
     dma_unassigned, ordered_timers = dma_resolver.write_dma_header(f, periph_list, mcu_type,
                                                    dma_exclude=get_dma_exclude(periph_list),
                                                    dma_priority=get_config('DMA_PRIORITY', default='TIM* SPI*', spaces=True),
-                                                   dma_noshare=get_config('DMA_NOSHARE', default='', spaces=True))
+                                                   dma_noshare=dma_noshare)
 
     if not args.bootloader:
         write_PWM_config(f, ordered_timers)
@@ -1920,6 +1954,8 @@ def build_peripheral_list():
                 if label[-1] == 'N':
                     label = label[:-1]
                 peripherals.append(label)
+                # RCIN DMA channel cannot be shared as it is running all the time
+                dma_noshare.append(label)
             elif not p.has_extra('ALARM') and not p.has_extra('RCININT'):
                 # get the TIMn_UP DMA channels for DShot
                 label = p.type + '_UP'
@@ -2115,6 +2151,36 @@ def process_file(filename):
         else:
             process_line(line)
 
+def add_apperiph_defaults(f):
+    '''add default defines for peripherals'''
+    if env_vars.get('AP_PERIPH',0) == 0:
+        # not AP_Periph
+        return
+    print("Setting up as AP_Periph")
+    f.write('''
+#ifndef HAL_SCHEDULER_ENABLED
+#define HAL_SCHEDULER_ENABLED 0
+#endif
+#ifndef HAL_LOGGING_ENABLED
+#define HAL_LOGGING_ENABLED 0
+#endif
+// default to no protocols, AP_Periph enables with params
+#define HAL_SERIAL1_PROTOCOL -1
+#define HAL_SERIAL2_PROTOCOL -1
+#define HAL_SERIAL3_PROTOCOL -1
+#define HAL_SERIAL4_PROTOCOL -1
+
+#ifndef HAL_LOGGING_MAVLINK_ENABLED
+#define HAL_LOGGING_MAVLINK_ENABLED 0
+#endif
+#ifndef HAL_MISSION_ENABLED
+#define HAL_MISSION_ENABLED 0
+#endif
+#ifndef HAL_RALLY_ENABLED
+#define HAL_RALLY_ENABLED 0
+#endif
+''')
+            
 
 # process input file
 process_file(args.hwdef)

@@ -429,6 +429,18 @@ bool AP_Logger_Backend::ShouldLog(bool is_critical)
         return false;
     }
 
+    if (_front.in_log_download() &&
+        _front._last_mavlink_log_transfer_message_handled_ms != 0) {
+        if (AP_HAL::millis() - _front._last_mavlink_log_transfer_message_handled_ms < 10000) {
+            if (!_front.vehicle_is_armed()) {
+                // user is transfering files via mavlink
+                return false;
+            }
+        } else {
+            _front._last_mavlink_log_transfer_message_handled_ms = 0;
+        }
+    }
+
     if (is_critical && have_logged_armed && !_front._params.file_disarm_rot) {
         // if we have previously logged while armed then we log all
         // critical messages from then on. That fixes a problem where
@@ -471,6 +483,7 @@ bool AP_Logger_Backend::Write_MessageF(const char *fmt, ...)
     return Write_Message(msg);
 }
 
+#if HAL_RALLY_ENABLED
 // Write rally points
 bool AP_Logger_Backend::Write_RallyPoint(uint8_t total,
                                          uint8_t sequence,
@@ -494,6 +507,7 @@ bool AP_Logger_Backend::Write_Rally()
     // kick off asynchronous write:
     return _startup_messagewriter->writeallrallypoints();
 }
+#endif
 
 /*
   convert a list entry number back into a log number (which can then

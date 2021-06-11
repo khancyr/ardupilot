@@ -14,6 +14,8 @@
  */
 
 #include "AP_Proximity.h"
+
+#if HAL_PROXIMITY_ENABLED
 #include "AP_Proximity_LightWareSF40C_v09.h"
 #include "AP_Proximity_RPLidarA2.h"
 #include "AP_Proximity_TeraRangerTower.h"
@@ -150,30 +152,27 @@ const AP_Param::GroupInfo AP_Proximity::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_IGN_WID6", 15, AP_Proximity, _ignore_width_deg[5], 0),
 
-#if PROXIMITY_MAX_INSTANCES > 1
-    // @Param: 2_TYPE
-    // @DisplayName: Second Proximity type
-    // @Description: What type of proximity sensor is connected
-    // @Values: 0:None,7:LightwareSF40c,1:LightWareSF40C-legacy,2:MAVLink,3:TeraRangerTower,4:RangeFinder,5:RPLidarA2,6:TeraRangerTowerEvo,8:LightwareSF45B,10:SITL,12:AirSimSITL
+    // @Param{Copter}: _IGN_GND
+    // @DisplayName: Proximity sensor land detection
+    // @Description: Ignore proximity data that is within 1 meter of the ground below the vehicle. This requires a downward facing rangefinder
+    // @Values: 0:Disabled, 1:Enabled
+    // @User: Standard
+    AP_GROUPINFO_FRAME("_IGN_GND", 16, AP_Proximity, _ign_gnd_enable, 0, AP_PARAM_FRAME_COPTER | AP_PARAM_FRAME_HELI | AP_PARAM_FRAME_TRICOPTER),
+
+    // @Param: _LOG_RAW
+    // @DisplayName: Proximity raw distances log
+    // @Description: Set this parameter to one if logging unfiltered(raw) distances from sensor should be enabled
+    // @Values: 0:Off, 1:On
     // @User: Advanced
-    // @RebootRequired: True
-    AP_GROUPINFO("2_TYPE", 16, AP_Proximity, _type[1], 0),
+    AP_GROUPINFO("_LOG_RAW", 17, AP_Proximity, _raw_log_enable, 0),
 
-    // @Param: 2_ORIENT
-    // @DisplayName: Second Proximity sensor orientation
-    // @Description: Second Proximity sensor orientation
-    // @Values: 0:Default,1:Upside Down
-    // @User: Standard
-    AP_GROUPINFO("2_ORIENT", 17, AP_Proximity, _orientation[1], 0),
-
-    // @Param: 2_YAW_CORR
-    // @DisplayName: Second Proximity sensor yaw correction
-    // @Description: Second Proximity sensor yaw correction
-    // @Units: deg
-    // @Range: -180 180
-    // @User: Standard
-    AP_GROUPINFO("2_YAW_CORR", 18, AP_Proximity, _yaw_correction[1], 0),
-#endif
+    // @Param: _FILT
+    // @DisplayName: Proximity filter cutoff frequency
+    // @Description: Cutoff frequency for low pass filter applied to each face in the proximity boundary
+    // @Units: Hz
+    // @Range: 0 20
+    // @User: Advanced
+    AP_GROUPINFO("_FILT", 18, AP_Proximity, _filt_freq, 0.25f),
 
     AP_GROUPEND
 };
@@ -218,6 +217,7 @@ void AP_Proximity::update(void)
             continue;
         }
         drivers[i]->update();
+        drivers[i]->boundary_3D_checks();
     }
 
     // work out primary instance - first sensor returning good data
@@ -359,6 +359,16 @@ bool AP_Proximity::get_horizontal_distances(Proximity_Distance_Array &prx_dist_a
     return drivers[primary_instance]->get_horizontal_distances(prx_dist_array);
 }
 
+// get raw and filtered distances in 8 directions per layer. used for logging
+bool AP_Proximity::get_active_layer_distances(uint8_t layer, AP_Proximity::Proximity_Distance_Array &prx_dist_array, AP_Proximity::Proximity_Distance_Array &prx_filt_dist_array) const
+{
+    if (!valid_instance(primary_instance)) {
+        return false;
+    }
+    // get distances from backend
+    return drivers[primary_instance]->get_active_layer_distances(layer, prx_dist_array, prx_filt_dist_array);
+}
+
 // get total number of obstacles, used in GPS based Simple Avoidance
 uint8_t AP_Proximity::get_obstacle_count() const
 {   
@@ -366,6 +376,15 @@ uint8_t AP_Proximity::get_obstacle_count() const
         return 0;
     }
     return drivers[primary_instance]->get_obstacle_count();
+}
+
+// get number of layers.
+uint8_t AP_Proximity::get_num_layers() const
+{
+    if (!valid_instance(primary_instance)) {
+        return 0;
+    }
+    return drivers[primary_instance]->get_num_layers();
 }
 
 // get vector to obstacle based on obstacle_num passed, used in GPS based Simple Avoidance
@@ -473,6 +492,17 @@ bool AP_Proximity::sensor_failed() const
     return get_status() != Status::Good;
 }
 
+// set alt as read from dowward facing rangefinder. Tilt is already adjusted for.
+void AP_Proximity::set_rangefinder_alt(bool use, bool healthy, float alt_cm)
+{
+    if (!valid_instance(primary_instance)) {
+        return;
+    }
+    // store alt at the backend
+    drivers[primary_instance]->set_rangefinder_alt(use, healthy, alt_cm);
+}
+
+
 AP_Proximity *AP_Proximity::_singleton;
 
 namespace AP {
@@ -483,3 +513,5 @@ AP_Proximity *proximity()
 }
 
 }
+
+#endif // HAL_PROXIMITY_ENABLED

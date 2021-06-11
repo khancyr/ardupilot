@@ -248,6 +248,9 @@ inline constexpr uint32_t usec_to_hz(uint32_t usec)
 
 /*
   linear interpolation based on a variable in a range
+  return value will be in the range [var_low,var_high]
+
+  Either polarity is supported, so var_low can be higher than var_high
  */
 float linear_interpolate(float low_output, float high_output,
                          float var_value,
@@ -296,6 +299,11 @@ float calc_lowpass_alpha_dt(float dt, float cutoff_freq);
 // fill an array of float with NaN, used to invalidate memory in SITL
 void fill_nanf(float *f, uint16_t count);
 #endif
+
+// from https://embeddedartistry.com/blog/2018/07/12/simple-fixed-point-conversion-in-c/
+// Convert to/from 16-bit fixed-point and float
+float fixed2float(const uint16_t input, const uint8_t fractional_bits = 8);
+uint16_t float2fixed(const float input, const uint8_t fractional_bits = 8);
 
 /*
   calculate turn rate in deg/sec given a bank angle and airspeed for a

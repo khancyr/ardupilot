@@ -8,6 +8,7 @@
 #include "AP_OpticalFlow_MAV.h"
 #include "AP_OpticalFlow_HereFlow.h"
 #include "AP_OpticalFlow_MSP.h"
+#include "AP_OpticalFlow_UPFLOW.h"
 #include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
@@ -26,10 +27,10 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: Optical flow sensor type
     // @Description: Optical flow sensor type
-    // @Values: 0:None, 1:PX4Flow, 2:Pixart, 3:Bebop, 4:CXOF, 5:MAVLink, 6:UAVCAN, 7:MSP
+    // @Values: 0:None, 1:PX4Flow, 2:Pixart, 3:Bebop, 4:CXOF, 5:MAVLink, 6:UAVCAN, 7:MSP, 8:UPFLOW
     // @User: Standard
     // @RebootRequired: True
-    AP_GROUPINFO("_TYPE", 0,  OpticalFlow,    _type,   (int8_t)OPTICAL_FLOW_TYPE_DEFAULT),
+    AP_GROUPINFO_FLAGS("_TYPE", 0,  OpticalFlow,    _type,   (int8_t)OPTICAL_FLOW_TYPE_DEFAULT, AP_PARAM_FLAG_ENABLE),
 
     // @Param: _FXSCALER
     // @DisplayName: X axis optical flow scale factor correction
@@ -51,8 +52,8 @@ const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @DisplayName: Flow sensor yaw alignment
     // @Description: Specifies the number of centi-degrees that the flow sensor is yawed relative to the vehicle. A sensor with its X-axis pointing to the right of the vehicle X axis has a positive yaw angle.
     // @Units: cdeg
-    // @Range: -18000 +18000
-    // @Increment: 1
+    // @Range: -17999 +18000
+    // @Increment: 10
     // @User: Standard
     AP_GROUPINFO("_ORIENT_YAW", 3,  OpticalFlow,    _yawAngle_cd,   0),
 
@@ -140,6 +141,9 @@ void OpticalFlow::init(uint32_t log_bit)
 #if HAL_MSP_OPTICALFLOW_ENABLED
         backend = AP_OpticalFlow_MSP::detect(*this);
 #endif
+        break;
+    case OpticalFlowType::UPFLOW:
+        backend = AP_OpticalFlow_UPFLOW::detect(*this);
         break;
     case OpticalFlowType::SITL:
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL

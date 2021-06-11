@@ -41,7 +41,7 @@ void NavEKF3_core::controlMagYawReset()
         // check if the spin rate is OK - high spin rates can cause angular alignment errors
         bool angRateOK = deltaRotVecTemp.length() < 0.1745f;
 
-        initialResetAllowed = angRateOK;
+        initialResetAllowed = angRateOK && tiltAlignComplete;
         flightResetAllowed = angRateOK && !onGround;
 
     }
@@ -94,7 +94,7 @@ void NavEKF3_core::controlMagYawReset()
     if (magYawResetRequest && use_compass()) {
         // send initial alignment status to console
         if (!yawAlignComplete) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u initial yaw alignment complete",(unsigned)imu_index);
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u MAG%u initial yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
         }
 
         // set yaw from a single mag sample
@@ -102,10 +102,10 @@ void NavEKF3_core::controlMagYawReset()
 
         // send in-flight yaw alignment status to console
         if (finalResetRequest) {
-            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u in-flight yaw alignment complete",(unsigned)imu_index);
+            GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u MAG%u in-flight yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
         } else if (interimResetRequest) {
             magYawAnomallyCount++;
-            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3 IMU%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index);
+            GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF3 IMU%u MAG%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index, (unsigned)magSelectIndex);
         }
 
         // clear the complete flags if an interim reset has been performed to allow subsequent
@@ -244,10 +244,9 @@ void NavEKF3_core::SelectMagFusion()
                 if (onGroundNotMoving) {
                     // fuse last known good yaw angle before we stopped moving to allow yaw bias learning when on ground before flight
                     fuseEulerYaw(yawFusionMethod::STATIC);
-                } else if (onGround || (sq(P[0][0])+sq(P[1][1])+sq(P[2][2])+sq(P[3][3]) > 0.01f)) {
-                    // prevent uncontrolled yaw variance growth by fusing a zero innovation
-                    // when not on ground allow more variance growth so yaw can be corrected
-                    // by manoeuvring
+                } else if (onGround || PV_AidingMode == AID_NONE || (P[0][0]+P[1][1]+P[2][2]+P[3][3] > 0.01f)) {
+                    // prevent uncontrolled yaw variance growth that can destabilise the covariance matrix
+                    // by fusing a zero innovation
                     fuseEulerYaw(yawFusionMethod::PREDICTED);
                 }
             }
@@ -265,13 +264,18 @@ void NavEKF3_core::SelectMagFusion()
             if (tiltAlignComplete && (!yawAlignComplete || yaw_source_reset)) {
                 alignYawAngle(yawAngDataDelayed);
                 yaw_source_reset = false;
+                have_fused_gps_yaw = true;
+                lastSynthYawTime_ms = imuSampleTime_ms;
+                last_gps_yaw_fuse_ms = imuSampleTime_ms;
             } else if (tiltAlignComplete && yawAlignComplete) {
-                fuseEulerYaw(yawFusionMethod::GPS);
+                have_fused_gps_yaw = fuseEulerYaw(yawFusionMethod::GPS);
+                if (have_fused_gps_yaw) {
+                    last_gps_yaw_fuse_ms = imuSampleTime_ms;
+                }
             }
-            have_fused_gps_yaw = true;
-            last_gps_yaw_fusion_ms = imuSampleTime_ms;
+            last_gps_yaw_ms = imuSampleTime_ms;
         } else if (tiltAlignComplete && !yawAlignComplete) {
-            // External yaw sources can take singificant time to start providing yaw data so
+            // External yaw sources can take significant time to start providing yaw data so
             // wuile waiting, fuse a 'fake' yaw observation at 7Hz to keeop the filter stable
             if(imuSampleTime_ms - lastSynthYawTime_ms > 140) {
                 yawAngDataDelayed.yawAngErr = MAX(frontend->_yawNoise, 0.05f);
@@ -285,7 +289,11 @@ void NavEKF3_core::SelectMagFusion()
                 }
                 lastSynthYawTime_ms = imuSampleTime_ms;
             }
+        } else if (tiltAlignComplete && yawAlignComplete && onGround && imuSampleTime_ms - last_gps_yaw_fuse_ms > 10000) {
+            // handle scenario where we were using GPS yaw previously, but the yaw fusion has timed out.
+            yaw_source_reset = true;
         }
+
         if (yaw_source == AP_NavEKF_Source::SourceYaw::GPS) {
             // no fallback
             return;
@@ -306,7 +314,7 @@ void NavEKF3_core::SelectMagFusion()
 
         // we don't have GPS yaw data and are configured for
         // fallback. If we've only just lost GPS yaw
-        if (imuSampleTime_ms - last_gps_yaw_fusion_ms < 10000) {
+        if (imuSampleTime_ms - last_gps_yaw_ms < 10000) {
             // don't fallback to magnetometer fusion for 10s
             return;
         }
@@ -316,7 +324,7 @@ void NavEKF3_core::SelectMagFusion()
             return;
         }
         if (!inFlight) {
-            // don't fall back if not flying
+            // don't fall back if not flying but reset to GPS yaw if it becomes available
             return;
         }
         if (!gps_yaw_mag_fallback_active) {
@@ -602,9 +610,14 @@ void NavEKF3_core::FuseMagnetometer()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = SK_MX[0]*(P[13][19] + P[13][1]*SH_MAG[0] - P[13][2]*SH_MAG[1] + P[13][3]*SH_MAG[2] + P[13][0]*SK_MX[2] - P[13][16]*SK_MX[1] + P[13][17]*SK_MX[4] - P[13][18]*SK_MX[3]);
-                Kfusion[14] = SK_MX[0]*(P[14][19] + P[14][1]*SH_MAG[0] - P[14][2]*SH_MAG[1] + P[14][3]*SH_MAG[2] + P[14][0]*SK_MX[2] - P[14][16]*SK_MX[1] + P[14][17]*SK_MX[4] - P[14][18]*SK_MX[3]);
-                Kfusion[15] = SK_MX[0]*(P[15][19] + P[15][1]*SH_MAG[0] - P[15][2]*SH_MAG[1] + P[15][3]*SH_MAG[2] + P[15][0]*SK_MX[2] - P[15][16]*SK_MX[1] + P[15][17]*SK_MX[4] - P[15][18]*SK_MX[3]);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = SK_MX[0]*(P[stateIndex][19] + P[stateIndex][1]*SH_MAG[0] - P[stateIndex][2]*SH_MAG[1] + P[stateIndex][3]*SH_MAG[2] + P[stateIndex][0]*SK_MX[2] - P[stateIndex][16]*SK_MX[1] + P[stateIndex][17]*SK_MX[4] - P[stateIndex][18]*SK_MX[3]);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -677,9 +690,14 @@ void NavEKF3_core::FuseMagnetometer()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = SK_MY[0]*(P[13][20] + P[13][0]*SH_MAG[2] + P[13][1]*SH_MAG[1] + P[13][2]*SH_MAG[0] - P[13][3]*SK_MY[2] - P[13][17]*SK_MY[1] - P[13][16]*SK_MY[3] + P[13][18]*SK_MY[4]);
-                Kfusion[14] = SK_MY[0]*(P[14][20] + P[14][0]*SH_MAG[2] + P[14][1]*SH_MAG[1] + P[14][2]*SH_MAG[0] - P[14][3]*SK_MY[2] - P[14][17]*SK_MY[1] - P[14][16]*SK_MY[3] + P[14][18]*SK_MY[4]);
-                Kfusion[15] = SK_MY[0]*(P[15][20] + P[15][0]*SH_MAG[2] + P[15][1]*SH_MAG[1] + P[15][2]*SH_MAG[0] - P[15][3]*SK_MY[2] - P[15][17]*SK_MY[1] - P[15][16]*SK_MY[3] + P[15][18]*SK_MY[4]);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = SK_MY[0]*(P[stateIndex][20] + P[stateIndex][0]*SH_MAG[2] + P[stateIndex][1]*SH_MAG[1] + P[stateIndex][2]*SH_MAG[0] - P[stateIndex][3]*SK_MY[2] - P[stateIndex][17]*SK_MY[1] - P[stateIndex][16]*SK_MY[3] + P[stateIndex][18]*SK_MY[4]);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -754,9 +772,14 @@ void NavEKF3_core::FuseMagnetometer()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = SK_MZ[0]*(P[13][21] + P[13][0]*SH_MAG[1] - P[13][1]*SH_MAG[2] + P[13][3]*SH_MAG[0] + P[13][2]*SK_MZ[2] + P[13][18]*SK_MZ[1] + P[13][16]*SK_MZ[4] - P[13][17]*SK_MZ[3]);
-                Kfusion[14] = SK_MZ[0]*(P[14][21] + P[14][0]*SH_MAG[1] - P[14][1]*SH_MAG[2] + P[14][3]*SH_MAG[0] + P[14][2]*SK_MZ[2] + P[14][18]*SK_MZ[1] + P[14][16]*SK_MZ[4] - P[14][17]*SK_MZ[3]);
-                Kfusion[15] = SK_MZ[0]*(P[15][21] + P[15][0]*SH_MAG[1] - P[15][1]*SH_MAG[2] + P[15][3]*SH_MAG[0] + P[15][2]*SK_MZ[2] + P[15][18]*SK_MZ[1] + P[15][16]*SK_MZ[4] - P[15][17]*SK_MZ[3]);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = SK_MZ[0]*(P[stateIndex][21] + P[stateIndex][0]*SH_MAG[1] - P[stateIndex][1]*SH_MAG[2] + P[stateIndex][3]*SH_MAG[0] + P[stateIndex][2]*SK_MZ[2] + P[stateIndex][18]*SK_MZ[1] + P[stateIndex][16]*SK_MZ[4] - P[stateIndex][17]*SK_MZ[3]);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -1287,9 +1310,14 @@ void NavEKF3_core::FuseDeclination(float declErr)
     }
 
     if (!inhibitDelVelBiasStates) {
-        Kfusion[13] = -t4*t13*(P[13][16]*magE-P[13][17]*magN);
-        Kfusion[14] = -t4*t13*(P[14][16]*magE-P[14][17]*magN);
-        Kfusion[15] = -t4*t13*(P[15][16]*magE-P[15][17]*magN);
+        for (uint8_t index = 0; index < 3; index++) {
+            const uint8_t stateIndex = index + 13;
+            if (!dvelBiasAxisInhibit[index]) {
+                Kfusion[stateIndex] = -t4*t13*(P[stateIndex][16]*magE-P[stateIndex][17]*magN);
+            } else {
+                Kfusion[stateIndex] = 0.0f;
+            }
+        }
     } else {
         // zero indexes 13 to 15 = 3*4 bytes
         memset(&Kfusion[13], 0, 12);

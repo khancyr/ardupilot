@@ -848,11 +848,12 @@ void NavEKF3_core::FuseVelPosNED()
                     R_OBS[obsIndex] *= sq(gpsNoiseScaler);
                 } else if (obsIndex == 5) {
                     innovVelPos[obsIndex] = stateStruct.position[obsIndex-3] - velPosObs[obsIndex];
-                    const float gndMaxBaroErr = 4.0f;
+                    const float gndMaxBaroErr = MAX(frontend->_baroGndEffectDeadZone, 0.0f);
                     const float gndBaroInnovFloor = -0.5f;
 
-                    if (expectGndEffectTouchdown && activeHgtSource == AP_NavEKF_Source::SourceZ::BARO) {
-                        // when a touchdown is expected, floor the barometer innovation at gndBaroInnovFloor
+                    if ((dal.get_touchdown_expected() || dal.get_takeoff_expected()) && activeHgtSource == AP_NavEKF_Source::SourceZ::BARO) {
+                        // when baro positive pressure error due to ground effect is expected,
+                        // floor the barometer innovation at gndBaroInnovFloor
                         // constrain the correction between 0 and gndBaroInnovFloor+gndMaxBaroErr
                         // this function looks like this:
                         //         |/
@@ -874,17 +875,41 @@ void NavEKF3_core::FuseVelPosNED()
                 // inhibit delta angle bias state estimation by setting Kalman gains to zero
                 if (!inhibitDelAngBiasStates) {
                     for (uint8_t i = 10; i<=12; i++) {
-                        Kfusion[i] = P[i][stateIndex]*SK;
+                        // Don't try to learn gyro bias if not aiding and the axis is
+                        // less than 45 degrees from vertical because the bias is poorly observable
+                        bool poorObservability = false;
+                        if (PV_AidingMode == AID_NONE) {
+                            const uint8_t axisIndex = i - 10;
+                            if (axisIndex == 0) {
+                                poorObservability = fabsf(prevTnb.a.z) > M_SQRT1_2;
+                            } else if (axisIndex == 1) {
+                                poorObservability = fabsf(prevTnb.b.z) > M_SQRT1_2;
+                            } else {
+                                poorObservability = fabsf(prevTnb.c.z) > M_SQRT1_2;
+                            }
+                        }
+                        if (poorObservability) {
+                            Kfusion[i] = 0.0;
+                        } else {
+                            Kfusion[i] = P[i][stateIndex]*SK;
+                        }
                     }
                 } else {
                     // zero indexes 10 to 12 = 3*4 bytes
                     memset(&Kfusion[10], 0, 12);
                 }
 
-                // inhibit delta velocity bias state estimation by setting Kalman gains to zero
-                if (!inhibitDelVelBiasStates) {
+                // Inhibit delta velocity bias state estimation by setting Kalman gains to zero
+                // Don't use 'fake' horizontal measurements used to constrain attitude drift during
+                // periods of non-aiding to learn bias as these can give incorrect esitmates.
+                const bool horizInhibit = PV_AidingMode == AID_NONE && obsIndex != 2 && obsIndex != 5;
+                if (!horizInhibit && !inhibitDelVelBiasStates) {
                     for (uint8_t i = 13; i<=15; i++) {
-                        Kfusion[i] = P[i][stateIndex]*SK;
+                        if (!dvelBiasAxisInhibit[i-13]) {
+                            Kfusion[i] = P[i][stateIndex]*SK;
+                        } else {
+                            Kfusion[i] = 0.0f;
+                        }
                     }
                 } else {
                     // zero indexes 13 to 15 = 3*4 bytes
@@ -1087,7 +1112,7 @@ void NavEKF3_core::selectHeightForFusion()
         }
         // filtered baro data used to provide a reference for takeoff
         // it is is reset to last height measurement on disarming in performArmingChecks()
-        if (!expectGndEffectTakeoff) {
+        if (!dal.get_takeoff_expected()) {
             const float gndHgtFiltTC = 0.5f;
             const float dtBaro = frontend->hgtAvg_ms*1.0e-3f;
             float alpha = constrain_float(dtBaro / (dtBaro+gndHgtFiltTC),0.0f,1.0f);
@@ -1153,13 +1178,8 @@ void NavEKF3_core::selectHeightForFusion()
         // set the observation noise
         posDownObsNoise = sq(constrain_float(frontend->_baroAltNoise, 0.1f, 10.0f));
         // reduce weighting (increase observation noise) on baro if we are likely to be experiencing rotor wash ground interaction
-        if (expectGndEffectTakeoff || expectGndEffectTouchdown) {
+        if (dal.get_takeoff_expected() || dal.get_touchdown_expected()) {
             posDownObsNoise *= frontend->gndEffectBaroScaler;
-        }
-        // If we are in takeoff mode, the height measurement is limited to be no less than the measurement at start of takeoff
-        // This prevents negative baro disturbances due to rotor wash ground interaction corrupting the EKF altitude during initial ascent
-        if (motorsArmed && expectGndEffectTakeoff) {
-            hgtMea = MAX(hgtMea, meaHgtAtTakeOff);
         }
         velPosObs[5] = -hgtMea;
     } else {
@@ -1363,9 +1383,14 @@ void NavEKF3_core::FuseBodyVel()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = t77*(P[13][5]*t4+P[13][4]*t9+P[13][0]*t14-P[13][6]*t11+P[13][1]*t18-P[13][2]*t21+P[13][3]*t24);
-                Kfusion[14] = t77*(P[14][5]*t4+P[14][4]*t9+P[14][0]*t14-P[14][6]*t11+P[14][1]*t18-P[14][2]*t21+P[14][3]*t24);
-                Kfusion[15] = t77*(P[15][5]*t4+P[15][4]*t9+P[15][0]*t14-P[15][6]*t11+P[15][1]*t18-P[15][2]*t21+P[15][3]*t24);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = t77*(P[stateIndex][5]*t4+P[stateIndex][4]*t9+P[stateIndex][0]*t14-P[stateIndex][6]*t11+P[stateIndex][1]*t18-P[stateIndex][2]*t21+P[stateIndex][3]*t24);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -1535,9 +1560,14 @@ void NavEKF3_core::FuseBodyVel()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = t77*(-P[13][4]*t3+P[13][5]*t8+P[13][0]*t15+P[13][6]*t12+P[13][1]*t18+P[13][2]*t22-P[13][3]*t25);
-                Kfusion[14] = t77*(-P[14][4]*t3+P[14][5]*t8+P[14][0]*t15+P[14][6]*t12+P[14][1]*t18+P[14][2]*t22-P[14][3]*t25);
-                Kfusion[15] = t77*(-P[15][4]*t3+P[15][5]*t8+P[15][0]*t15+P[15][6]*t12+P[15][1]*t18+P[15][2]*t22-P[15][3]*t25);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = t77*(-P[stateIndex][4]*t3+P[stateIndex][5]*t8+P[stateIndex][0]*t15+P[stateIndex][6]*t12+P[stateIndex][1]*t18+P[stateIndex][2]*t22-P[stateIndex][3]*t25);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -1708,9 +1738,14 @@ void NavEKF3_core::FuseBodyVel()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = t77*(P[13][4]*t4+P[13][0]*t14+P[13][6]*t9-P[13][5]*t11-P[13][1]*t17+P[13][2]*t20+P[13][3]*t24);
-                Kfusion[14] = t77*(P[14][4]*t4+P[14][0]*t14+P[14][6]*t9-P[14][5]*t11-P[14][1]*t17+P[14][2]*t20+P[14][3]*t24);
-                Kfusion[15] = t77*(P[15][4]*t4+P[15][0]*t14+P[15][6]*t9-P[15][5]*t11-P[15][1]*t17+P[15][2]*t20+P[15][3]*t24);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = t77*(P[stateIndex][4]*t4+P[stateIndex][0]*t14+P[stateIndex][6]*t9-P[stateIndex][5]*t11-P[stateIndex][1]*t17+P[stateIndex][2]*t20+P[stateIndex][3]*t24);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);

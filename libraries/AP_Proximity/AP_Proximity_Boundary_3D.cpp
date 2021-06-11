@@ -1,5 +1,22 @@
-#include "AP_Proximity_Backend.h"
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "AP_Proximity_Boundary_3D.h"
+
+#if HAL_PROXIMITY_ENABLED
+#include "AP_Proximity_Backend.h"
 
 /*
   Constructor. 
@@ -49,25 +66,43 @@ void AP_Proximity_Boundary_3D::set_face_attributes(const Face &face, float pitch
     _distance[face.layer][face.sector] = distance;
     _distance_valid[face.layer][face.sector] = true;
 
+    // apply filter
+    set_filtered_distance(face, distance);
+
     // update boundary used for simple avoidance
     update_boundary(face);
 }
 
-// add a distance to the boundary if it is shorter than any other provided distance since the last time the boundary was reset
-// pitch and yaw are in degrees, distance is in meters
-void AP_Proximity_Boundary_3D::add_distance(float pitch, float yaw, float distance)
+// apply a new cutoff_freq to low-pass filter
+void AP_Proximity_Boundary_3D::apply_filter_freq(float cutoff_freq)
 {
-    Face face = get_face(pitch, yaw);
+    for (uint8_t layer=0; layer < PROXIMITY_NUM_LAYERS; layer++) {
+        for (uint8_t sector=0; sector < PROXIMITY_NUM_SECTORS; sector++) {
+            _filtered_distance[layer][sector].set_cutoff_frequency(cutoff_freq);
+        }
+    }
+}
+
+// Apply low pass filter on the raw distance
+void AP_Proximity_Boundary_3D::set_filtered_distance(const Face &face, float distance)
+{
     if (!face.valid()) {
         return;
     }
-    
-    if (!_distance_valid[face.layer][face.sector] || (distance < _distance[face.layer][face.sector])) {
-        _distance[face.layer][face.sector] = distance;
-        _distance_valid[face.layer][face.sector] = true;
-        _angle[face.layer][face.sector] = yaw;
-        _pitch[face.layer][face.sector] = pitch;
+    if (!is_equal(_filtered_distance[face.layer][face.sector].get_cutoff_freq(), _filter_freq)) {
+        // cutoff freq has changed
+        apply_filter_freq(_filter_freq);
     }
+
+    const uint32_t now_ms = AP_HAL::millis();
+    const uint32_t dt = now_ms - _last_update_ms[face.layer][face.sector];
+    if (dt < PROXIMITY_FILT_RESET_TIME) {
+        _filtered_distance[face.layer][face.sector].apply(distance, dt* 0.001f);
+    } else {
+        // reset filter since last distance was passed a long time back
+        _filtered_distance[face.layer][face.sector].reset(distance);
+    }
+    _last_update_ms[face.layer][face.sector] = now_ms;
 }
 
 // update boundary points used for object avoidance based on a single sector and pitch distance changing
@@ -89,11 +124,11 @@ void AP_Proximity_Boundary_3D::update_boundary(const Face &face)
     // boundary point lies on the line between the two sectors at the shorter distance found in the two sectors
     float shortest_distance = PROXIMITY_BOUNDARY_DIST_DEFAULT;
     if (_distance_valid[layer][sector] && _distance_valid[layer][next_sector]) {
-        shortest_distance = MIN(_distance[layer][sector], _distance[layer][next_sector]);
+        shortest_distance = MIN(_filtered_distance[layer][sector].get(), _filtered_distance[layer][next_sector].get());
     } else if (_distance_valid[layer][sector]) {
-        shortest_distance = _distance[layer][sector];
+        shortest_distance = _filtered_distance[layer][sector].get();
     } else if (_distance_valid[layer][next_sector]) {
-        shortest_distance = _distance[layer][next_sector];
+        shortest_distance = _filtered_distance[layer][next_sector].get();
     }
     if (shortest_distance < PROXIMITY_BOUNDARY_DIST_MIN) {
         shortest_distance = PROXIMITY_BOUNDARY_DIST_MIN;
@@ -109,11 +144,11 @@ void AP_Proximity_Boundary_3D::update_boundary(const Face &face)
     const uint8_t prev_sector = get_prev_sector(sector);
     shortest_distance = PROXIMITY_BOUNDARY_DIST_DEFAULT;
     if (_distance_valid[layer][prev_sector] && _distance_valid[layer][sector]) {
-        shortest_distance = MIN(_distance[layer][prev_sector], _distance[layer][sector]);
+        shortest_distance = MIN(_filtered_distance[layer][prev_sector].get(), _filtered_distance[layer][sector].get());
     } else if (_distance_valid[layer][prev_sector]) {
-        shortest_distance = _distance[layer][prev_sector];
+        shortest_distance = _filtered_distance[layer][prev_sector].get();
     } else if (_distance_valid[layer][sector]) {
-        shortest_distance = _distance[layer][sector];
+        shortest_distance = _filtered_distance[layer][sector].get();
     }
     _boundary_points[layer][prev_sector] = _sector_edge_vector[layer][prev_sector] * shortest_distance;
 
@@ -121,14 +156,6 @@ void AP_Proximity_Boundary_3D::update_boundary(const Face &face)
     const uint8_t prev_sector_ccw = get_prev_sector(prev_sector);
     if (!_distance_valid[layer][prev_sector_ccw]) {
         _boundary_points[layer][prev_sector_ccw] = _sector_edge_vector[layer][prev_sector_ccw] * shortest_distance;
-    }
-}
-
-// update middle layer boundary points
-void AP_Proximity_Boundary_3D::update_middle_boundary()
-{
-    for (uint8_t sector=0; sector < PROXIMITY_NUM_SECTORS; sector++) {
-        update_boundary(Face{PROXIMITY_MIDDLE_LAYER, sector});
     }
 }
 
@@ -153,6 +180,22 @@ void AP_Proximity_Boundary_3D::reset_face(const Face &face)
 
     // update simple avoidance boundary
     update_boundary(face);
+}
+
+// check if a face has valid distance even if it was updated a long time back
+void AP_Proximity_Boundary_3D::check_face_timeout()
+{
+    for (uint8_t layer=0; layer < PROXIMITY_NUM_LAYERS; layer++) {
+        for (uint8_t sector=0; sector < PROXIMITY_NUM_SECTORS; sector++) {
+            if (_distance_valid[layer][sector]) {
+                if ((AP_HAL::millis() - _last_update_ms[layer][sector]) > PROXIMITY_FACE_RESET_MS) {
+                    // this face has a valid distance but wasn't updated for a long time, reset it
+                    AP_Proximity_Boundary_3D::Face face{layer, sector};
+                    reset_face(face);
+                }
+            }
+        }
+    }
 }
 
 // get distance for a face.  returns true on success and fills in distance argument with distance in meters
@@ -286,8 +329,87 @@ bool AP_Proximity_Boundary_3D::get_horizontal_object_angle_and_distance(uint8_t 
 {
     if ((object_number < PROXIMITY_NUM_SECTORS) && _distance_valid[PROXIMITY_MIDDLE_LAYER][object_number]) {
         angle_deg = _angle[PROXIMITY_MIDDLE_LAYER][object_number];
-        distance = _distance[PROXIMITY_MIDDLE_LAYER][object_number];
+        distance = _filtered_distance[PROXIMITY_MIDDLE_LAYER][object_number].get();
         return true;
     }
     return false;
 }
+
+// Return filtered distance for the passed in face
+bool AP_Proximity_Boundary_3D::get_filtered_distance(const Face &face, float &distance) const
+{
+    if (!face.valid()) {
+        return false;
+    }
+
+    if (!_distance_valid[face.layer][face.sector]) {
+        // invalid distace
+        return false;
+    }
+
+    distance = _filtered_distance[face.layer][face.sector].get();
+    return true;
+}
+
+// Get raw and filtered distances in 8 directions per layer
+bool AP_Proximity_Boundary_3D::get_layer_distances(uint8_t layer_number, float dist_max, AP_Proximity::Proximity_Distance_Array &prx_dist_array, AP_Proximity::Proximity_Distance_Array &prx_filt_dist_array) const
+{
+    // cycle through all sectors filling in distances and orientations
+    // see MAV_SENSOR_ORIENTATION for orientations (0 = forward, 1 = 45 degree clockwise from north, etc)
+    bool valid_distances = false;
+    prx_dist_array.offset_valid = 0;
+    prx_filt_dist_array.offset_valid = 0;
+    for (uint8_t i=0; i<PROXIMITY_MAX_DIRECTION; i++) {
+        prx_dist_array.orientation[i] = i;
+        const AP_Proximity_Boundary_3D::Face face(layer_number, i);
+        if (!face.valid()) {
+            return false;
+        }
+        if (get_distance(face, prx_dist_array.distance[i]) && get_filtered_distance(face, prx_filt_dist_array.distance[i])) {
+            valid_distances = true;
+            prx_dist_array.offset_valid |= (1U << i);
+            prx_filt_dist_array.offset_valid |= (1U << i);
+        } else {
+            prx_dist_array.distance[i] = dist_max;
+            prx_filt_dist_array.distance[i] = dist_max;
+        }
+    }
+
+    return valid_distances;
+}
+
+// reset the temporary boundary. This fills in distances with FLT_MAX
+void AP_Proximity_Temp_Boundary::reset()
+{
+    for (uint8_t layer=0; layer < PROXIMITY_NUM_LAYERS; layer++) {
+        for (uint8_t sector=0; sector < PROXIMITY_NUM_SECTORS; sector++) {
+            _distances[layer][sector] = FLT_MAX;
+        }
+    }
+}
+
+// add a distance to the temp boundary if it is shorter than any other provided distance since the last time the boundary was reset
+// pitch and yaw are in degrees, distance is in meters
+void AP_Proximity_Temp_Boundary::add_distance(const AP_Proximity_Boundary_3D::Face &face, float pitch, float yaw, float distance)
+{
+    if (face.valid() && distance < _distances[face.layer][face.sector]) {
+        _distances[face.layer][face.sector] = distance;
+        _angle[face.layer][face.sector] = yaw;
+        _pitch[face.layer][face.sector] = pitch;
+    }
+}
+
+// fill the original 3D boundary with the contents of this temporary boundary
+void AP_Proximity_Temp_Boundary::update_3D_boundary(AP_Proximity_Boundary_3D &boundary)
+{
+    for (uint8_t layer=0; layer < PROXIMITY_NUM_LAYERS; layer++) {
+        for (uint8_t sector=0; sector < PROXIMITY_NUM_SECTORS; sector++) {
+            if (_distances[layer][sector] < FLT_MAX) {
+                AP_Proximity_Boundary_3D::Face face{layer, sector};
+                boundary.set_face_attributes(face, _pitch[layer][sector], _angle[layer][sector], _distances[layer][sector]);
+            }
+        }
+    }
+}
+
+#endif // HAL_PROXIMITY_ENABLED

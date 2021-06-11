@@ -620,6 +620,33 @@ Quaternion Quaternion::operator*(const Quaternion &v) const
     return ret;
 }
 
+// Optimized quaternion rotation operator, equivalent to converting
+// (*this) to a rotation matrix then multiplying it to the argument `v`.
+//
+// 15 multiplies and 15 add / subtracts. Caches 3 floats
+Vector3f Quaternion::operator*(const Vector3f &v) const
+{
+    // This uses the formula
+    //
+    //    v2 = v1 + 2 q1 * qv x v1 + 2 qv x qv x v1
+    //
+    // where "x" is the cross product (explicitly inlined for performance below), 
+    // "q1" is the scalar part and "qv" is the vector part of this quaternion
+
+    Vector3f ret = v;
+
+    // Compute and cache "qv x v1"
+    float uv[] = {q3 * v.z - q4 * v.y, q4 * v.x - q2 * v.z, q2 * v.y - q3 * v.x};
+
+    uv[0] += uv[0];
+    uv[1] += uv[1];
+    uv[2] += uv[2];
+    ret.x += q1 * uv[0] + q3 * uv[2] - q4 * uv[1];
+    ret.y += q1 * uv[1] + q4 * uv[0] - q2 * uv[2];
+    ret.z += q1 * uv[2] + q2 * uv[1] - q3 * uv[0];
+    return ret;
+}
+
 Quaternion &Quaternion::operator*=(const Quaternion &v)
 {
     const float w1 = q1;
@@ -664,4 +691,23 @@ Quaternion Quaternion::operator/(const Quaternion &v) const
 Quaternion Quaternion::angular_difference(const Quaternion &v) const
 {
     return v.inverse() * *this;
+}
+
+// absolute (e.g. always positive) earth-frame roll-pitch difference (in radians) between this Quaternion and another
+float Quaternion::roll_pitch_difference(const Quaternion &v) const
+{
+    // convert Quaternions to rotation matrices
+    Matrix3f m, vm;
+    rotation_matrix(m);
+    v.rotation_matrix(vm);
+
+    // rotate earth frame vertical vector by each rotation matrix
+    const Vector3f z_unit_vec{0,0,1};
+    const Vector3f z_unit_m = m.mul_transpose(z_unit_vec);
+    const Vector3f z_unit_vm = vm.mul_transpose(z_unit_vec);
+    const Vector3f vec_diff = z_unit_vm - z_unit_m;
+    const float vec_len_div2 = constrain_float(vec_diff.length() * 0.5f, 0.0f, 1.0f);
+
+    // calculate and return angular difference
+    return (2.0f * asinf(vec_len_div2));
 }

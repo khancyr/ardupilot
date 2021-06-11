@@ -38,6 +38,8 @@
 #include <AP_MSP/msp.h>
 #include <AP_OLC/AP_OLC.h>
 #include <AP_VideoTX/AP_VideoTX.h>
+#include <AP_Terrain/AP_Terrain.h>
+#include <AP_RangeFinder/AP_RangeFinder.h>
 #if APM_BUILD_TYPE(APM_BUILD_Rover)
 #include <AP_WindVane/AP_WindVane.h>
 #endif
@@ -45,6 +47,7 @@
 
 #include <ctype.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AC_Fence/AC_Fence.h>
 
 const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
 
@@ -151,7 +154,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
 
     // @Param: SATS_EN
     // @DisplayName: SATS_EN
-    // @Description: Displays number of acquired sattelites
+    // @Description: Displays number of acquired satellites
     // @Values: 0:Disabled,1:Enabled
 
     // @Param: SATS_X
@@ -341,8 +344,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
     // @Description: Vertical position on screen
     // @Range: 0 15
     AP_SUBGROUPINFO(vspeed, "VSPEED", 20, AP_OSD_Screen, AP_OSD_Setting),
-
-#ifdef HAVE_AP_BLHELI_SUPPORT
+#if HAL_WITH_ESC_TELEM
     // @Param: BLHTEMP_EN
     // @DisplayName: BLHTEMP_EN
     // @Description: Displays first esc's temp
@@ -391,7 +393,6 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
     // @Range: 0 15
     AP_SUBGROUPINFO(blh_amps, "BLHAMPS", 23, AP_OSD_Screen, AP_OSD_Setting),
 #endif
-
     // @Param: GPSLAT_EN
     // @DisplayName: GPSLAT_EN
     // @Description: Displays GPS latitude
@@ -712,7 +713,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
     // @Description: Vertical position on screen
     // @Range: 0 15
     AP_SUBGROUPINFO(clk, "CLK", 43, AP_OSD_Screen, AP_OSD_Setting),
-    
+
 #if HAL_MSP_ENABLED
     // @Param: SIDEBARS_EN
     // @DisplayName: SIDEBARS_EN
@@ -721,7 +722,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
 
     // @Param: SIDEBARS_X
     // @DisplayName: SIDEBARS_X
-    // @Description: Horizontal position on screen (MSP OSD only) 
+    // @Description: Horizontal position on screen (MSP OSD only)
     // @Range: 0 29
 
     // @Param: SIDEBARS_Y
@@ -737,7 +738,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
 
     // @Param: CRSSHAIR_X
     // @DisplayName: CRSSHAIR_X
-    // @Description: Horizontal position on screen (MSP OSD only) 
+    // @Description: Horizontal position on screen (MSP OSD only)
     // @Range: 0 29
 
     // @Param: CRSSHAIR_Y
@@ -846,7 +847,7 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
 #if HAL_PLUSCODE_ENABLE
     // @Param: PLUSCODE_EN
     // @DisplayName: PLUSCODE_EN
-    // @Description: Displays pluscode (OLC) element 
+    // @Description: Displays pluscode (OLC) element
     // @Values: 0:Disabled,1:Enabled
 
     // @Param: PLUSCODE_X
@@ -911,6 +912,87 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info[] = {
     // @Range: 0 15
     AP_SUBGROUPINFO(vtx_power, "VTX_PWR", 55, AP_OSD_Screen, AP_OSD_Setting),
 
+#if AP_TERRAIN_AVAILABLE
+    // @Param: TER_HGT_EN
+    // @DisplayName: TER_HGT_EN
+    // @Description: Displays Height above terrain
+    // @Values: 0:Disabled,1:Enabled
+
+    // @Param: TER_HGT_X
+    // @DisplayName: TER_HGT_X
+    // @Description: Horizontal position on screen
+    // @Range: 0 29
+
+    // @Param: TER_HGT_Y
+    // @DisplayName: TER_HGT_Y
+    // @Description: Vertical position on screen
+    // @Range: 0 15
+    AP_SUBGROUPINFO(hgt_abvterr, "TER_HGT", 56, AP_OSD_Screen, AP_OSD_Setting),
+#endif
+
+    // @Param: AVGCELLV_EN
+    // @DisplayName: AVGCELLV_EN
+    // @Description: Displays average cell voltage. WARNING: this can be inaccurate if the cell count is not detected or set properly. If the  the battery is far from fully charged the detected cell count might not be accurate if auto cell count detection is used (OSD_CELL_COUNT=0).
+    // @Values: 0:Disabled,1:Enabled
+
+    // @Param: AVGCELLV_X
+    // @DisplayName: AVGCELLV_X
+    // @Description: Horizontal position on screen
+    // @Range: 0 29
+
+    // @Param: AVGCELLV_Y
+    // @DisplayName: AVGCELLV_Y
+    // @Description: Vertical position on screen
+    // @Range: 0 15
+    AP_SUBGROUPINFO(avgcellvolt, "AVGCELLV", 57, AP_OSD_Screen, AP_OSD_Setting),
+
+    // @Param: RESTVOLT_EN
+    // @DisplayName: RESTVOLT_EN
+    // @Description: Displays main battery resting voltage
+    // @Values: 0:Disabled,1:Enabled
+
+    // @Param: RESTVOLT_X
+    // @DisplayName: RESTVOLT_X
+    // @Description: Horizontal position on screen
+    // @Range: 0 29
+
+    // @Param: RESTVOLT_Y
+    // @DisplayName: RESTVOLT_Y
+    // @Description: Vertical position on screen
+    // @Range: 0 15
+    AP_SUBGROUPINFO(restvolt, "RESTVOLT", 58, AP_OSD_Screen, AP_OSD_Setting),
+
+    // @Param: FENCE_EN
+    // @DisplayName: FENCE_EN
+    // @Description: Displays indication of fence enable and breach
+    // @Values: 0:Disabled,1:Enabled
+
+    // @Param: FENCE_X
+    // @DisplayName: FENCE_X
+    // @Description: Horizontal position on screen
+    // @Range: 0 29
+
+    // @Param: FENCE_Y
+    // @DisplayName: FENCE_Y
+    // @Description: Vertical position on screen
+    // @Range: 0 15
+    AP_SUBGROUPINFO(fence, "FENCE", 59, AP_OSD_Screen, AP_OSD_Setting),
+
+    // @Param: RNGF_EN
+    // @DisplayName: RNGF_EN
+    // @Description: Displays a rangefinder's distance in cm
+    // @Values: 0:Disabled,1:Enabled
+
+    // @Param: RNGF_X
+    // @DisplayName: RNGF_X
+    // @Description: Horizontal position on screen
+    // @Range: 0 29
+
+    // @Param: RNGF_Y
+    // @DisplayName: RNGF_Y
+    // @Description: Vertical position on screen
+    // @Range: 0 15
+    AP_SUBGROUPINFO(rngf, "RNGF", 60, AP_OSD_Screen, AP_OSD_Setting),
     AP_GROUPEND
 };
 
@@ -1005,6 +1087,12 @@ AP_OSD_Screen::AP_OSD_Screen()
 #define SYM_AH        0xF3
 #define SYM_MW        0xF4
 #define SYM_CLK       0xBC
+#define SYM_KILO      0x4B
+#define SYM_TERALT 0xEF
+#define SYM_FENCE_ENABLED 0xF5
+#define SYM_FENCE_DISABLED 0xF6
+#define SYM_RNGFD     0xF7
+
 
 void AP_OSD_AbstractScreen::set_backend(AP_OSD_Backend *_backend)
 {
@@ -1143,6 +1231,36 @@ void AP_OSD_Screen::draw_bat_volt(uint8_t x, uint8_t y)
     backend->write(x,y, v < osd->warn_batvolt, "%c%2.1f%c", SYM_BATT_FULL + p, (double)v, SYM_VOLT);
 }
 
+void AP_OSD_Screen::draw_avgcellvolt(uint8_t x, uint8_t y)
+{
+    AP_BattMonitor &battery = AP::battery();
+    uint8_t pct = battery.capacity_remaining_pct();
+    uint8_t p = (100 - pct) / 16.6;
+    float v = battery.voltage();
+    // calculate cell count - WARNING this can be inaccurate if the LIPO/LIION  battery is far from fully charged when attached and is used in this panel
+    osd->max_battery_voltage = MAX(osd->max_battery_voltage,v);
+    if (osd->cell_count > 0) {
+        v = v / osd->cell_count;  
+        backend->write(x,y, v < osd->warn_avgcellvolt, "%c%1.2f%c", SYM_BATT_FULL + p, v, SYM_VOLT);
+    } else if (osd->cell_count < 0) { // user must decide on autodetect cell count or manually entered to display this panel since default is -1
+        backend->write(x,y, false, "%c---%c", SYM_BATT_FULL + p, SYM_VOLT);
+    } else {  // use autodetected cell count
+        v = v /  (uint8_t)(osd->max_battery_voltage * 0.2381 + 1);
+        backend->write(x,y, v < osd->warn_avgcellvolt, "%c%1.2f%c", SYM_BATT_FULL + p, v, SYM_VOLT);
+    }
+}
+
+void AP_OSD_Screen::draw_restvolt(uint8_t x, uint8_t y)
+{
+    AP_BattMonitor &battery = AP::battery();
+    uint8_t pct = battery.capacity_remaining_pct();
+    uint8_t p = (100 - pct) / 16.6;
+    float v = battery.voltage_resting_estimate();
+    backend->write(x,y, v < osd->warn_restvolt, "%c%2.1f%c", SYM_BATT_FULL + p, (double)v, SYM_VOLT);
+}
+
+
+
 void AP_OSD_Screen::draw_rssi(uint8_t x, uint8_t y)
 {
     AP_RSSI *ap_rssi = AP_RSSI::get_singleton();
@@ -1273,10 +1391,10 @@ void AP_OSD_Screen::draw_speed(uint8_t x, uint8_t y, float angle_rad, float magn
 {
     static const int32_t interval = 36000 / SYM_ARROW_COUNT;
     char arrow = SYM_ARROW_START + ((int32_t(angle_rad*DEGX100) + interval / 2) / interval) % SYM_ARROW_COUNT;
-    if (u_scale(SPEED, magnitude) < 10.0) {
-        backend->write(x, y, false, "%c%3.1f%c", arrow, u_scale(SPEED, magnitude), u_icon(SPEED)); 
+    if (u_scale(SPEED, magnitude) < 9.95) {
+        backend->write(x, y, false, "%c %1.1f%c", arrow, u_scale(SPEED, magnitude), u_icon(SPEED));
     } else {
-        backend->write(x, y, false, "%c%3d%c", arrow, (int)u_scale(SPEED, magnitude), u_icon(SPEED));
+        backend->write(x, y, false, "%c%3d%c", arrow, (int)roundf(u_scale(SPEED, magnitude)), u_icon(SPEED));
     }
 }
 
@@ -1503,52 +1621,41 @@ void AP_OSD_Screen::draw_vspeed(uint8_t x, uint8_t y)
     }
 }
 
-#ifdef HAVE_AP_BLHELI_SUPPORT
-
+#if HAL_WITH_ESC_TELEM
 void AP_OSD_Screen::draw_blh_temp(uint8_t x, uint8_t y)
 {
-    AP_BLHeli *blheli = AP_BLHeli::get_singleton();
-    if (blheli) {
-        AP_BLHeli::telem_data td;
-        // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
-        if (!blheli->get_telem_data(0, td)) {
-            return;
-        }
-
-        // AP_BLHeli & blh = AP_BLHeli::AP_BLHeli();
-        uint8_t esc_temp = td.temperature;
-        backend->write(x, y, false, "%3d%c", (int)u_scale(TEMPERATURE, esc_temp), u_icon(TEMPERATURE));
+    int16_t etemp;
+    // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
+    if (!AP::esc_telem().get_temperature(0, etemp)) {
+        return;
     }
+
+    uint8_t esc_temp = uint8_t(etemp / 100);
+    backend->write(x, y, false, "%3d%c", (int)u_scale(TEMPERATURE, esc_temp), u_icon(TEMPERATURE));
 }
 
 void AP_OSD_Screen::draw_blh_rpm(uint8_t x, uint8_t y)
 {
-    AP_BLHeli *blheli = AP_BLHeli::get_singleton();
-    if (blheli) {
-        AP_BLHeli::telem_data td;
-        // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
-        if (!blheli->get_telem_data(0, td)) {
-            return;
-        }
-        backend->write(x, y, false, "%5d%c", td.rpm, SYM_RPM);
+    float rpm;
+    // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
+    if (!AP::esc_telem().get_rpm(0, rpm)) {
+        return;
     }
+    float krpm = rpm * 0.001f;
+    const char *format = krpm < 9.995 ? "%.2f%c%c" : (krpm < 99.95 ? "%.1f%c%c" : "%.0f%c%c");
+    backend->write(x, y, false, format, krpm, SYM_KILO, SYM_RPM);
 }
 
 void AP_OSD_Screen::draw_blh_amps(uint8_t x, uint8_t y)
 {
-    AP_BLHeli *blheli = AP_BLHeli::get_singleton();
-    if (blheli) {
-        AP_BLHeli::telem_data td;
-        // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
-        if (!blheli->get_telem_data(0, td)) {
-            return;
-        }
-
-        float esc_amps = td.current * 0.01;
-        backend->write(x, y, false, "%4.1f%c", esc_amps, SYM_AMP);
+    float esc_amps;
+    // first parameter is index into array of ESC's.  Hardwire to zero (first) for now.
+    if (!AP::esc_telem().get_current(0, esc_amps)) {
+        return;
     }
+    backend->write(x, y, false, "%4.1f%c", esc_amps, SYM_AMP);
 }
-#endif  //HAVE_AP_BLHELI_SUPPORT
+#endif
 
 void AP_OSD_Screen::draw_gps_latitude(uint8_t x, uint8_t y)
 {
@@ -1665,7 +1772,7 @@ void  AP_OSD_Screen::draw_flightime(uint8_t x, uint8_t y)
     AP_Stats *stats = AP::stats();
     if (stats) {
         uint32_t t = stats->get_flight_time_s();
-        backend->write(x, y, false, "%c%3u:%02u", SYM_FLY, t/60, t%60);
+        backend->write(x, y, false, "%c%3u:%02u", SYM_FLY, unsigned(t/60), unsigned(t%60));
     }
 }
 
@@ -1787,7 +1894,7 @@ void AP_OSD_Screen::draw_clk(uint8_t x, uint8_t y)
     uint8_t hour, min, sec;
     uint16_t ms;
     if (!rtc.get_local_time(hour, min, sec, ms)) {
-    backend->write(x, y, false, "%c--:--%", SYM_CLK);
+    backend->write(x, y, false, "%c--:--", SYM_CLK);
     } else {
     backend->write(x, y, false, "%c%02u:%02u", SYM_CLK, hour, min);
     }
@@ -1803,7 +1910,7 @@ void AP_OSD_Screen::draw_pluscode(uint8_t x, uint8_t y)
         backend->write(x, y, false, "--------+--");
     } else {
         AP_OLC::olc_encode(loc.lat, loc.lng, 10, buff, sizeof(buff));
-        backend->write(x, y, false, buff);
+        backend->write(x, y, false, "%s", buff);
     }
 }
 #endif
@@ -1828,7 +1935,7 @@ void AP_OSD_Screen::draw_callsign(uint8_t x, uint8_t y)
         }
     }
     if (callsign_data.str != nullptr) {
-        backend->write(x, y, false, callsign_data.str);
+        backend->write(x, y, false, "%s", callsign_data.str);
     }
 #endif
 }
@@ -1851,6 +1958,47 @@ void AP_OSD_Screen::draw_vtx_power(uint8_t x, uint8_t y)
     }
     backend->write(x, y, false, "%4hu%c", powr, SYM_MW);
 }
+#if AP_TERRAIN_AVAILABLE
+void AP_OSD_Screen::draw_hgt_abvterr(uint8_t x, uint8_t y)
+{
+    AP_Terrain *terrain = AP::terrain();
+
+    float terrain_altitude;
+    if (terrain != nullptr && terrain->height_above_terrain(terrain_altitude,true)) {
+        bool blink = (osd->warn_terr != -1)? (terrain_altitude < osd->warn_terr) : false; //blink if warn_terr is not disabled and alt above terrain is below warning value
+        backend->write(x, y, blink, "%4d%c%c", (int)u_scale(ALTITUDE, terrain_altitude), u_icon(ALTITUDE), SYM_TERALT);
+     } else {
+        backend->write(x, y, false, " ---%c%c", u_icon(ALTITUDE),SYM_TERALT);
+     }
+}
+#endif
+
+
+void AP_OSD_Screen::draw_fence(uint8_t x, uint8_t y)
+{
+    AC_Fence *fenceptr = AP::fence();
+    if (fenceptr == nullptr) {
+       return;
+    }
+    if (fenceptr->enabled() && fenceptr->present()) {
+        backend->write(x, y, fenceptr->get_breaches(), "%c", SYM_FENCE_ENABLED);
+    } else {
+        backend->write(x, y, false, "%c", SYM_FENCE_DISABLED);
+    }
+}
+
+void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
+{
+    RangeFinder *rangefinder = RangeFinder::get_singleton();
+    if (rangefinder == nullptr) {
+       return;
+    }
+    if (rangefinder->status_orient(ROTATION_PITCH_270) <= RangeFinder::Status::NoData) {
+        backend->write(x, y, false, "%cNO DATA", SYM_RNGFD);
+    } else {
+        backend->write(x, y, false, "%c%2.2f%c", SYM_RNGFD, u_scale(DISTANCE, (rangefinder->distance_cm_orient(ROTATION_PITCH_270) * 0.01f)), u_icon(DISTANCE));
+    }
+}
 
 #define DRAW_SETTING(n) if (n.enabled) draw_ ## n(n.xpos, n.ypos)
 
@@ -1868,10 +2016,18 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(horizon);
     DRAW_SETTING(compass);
     DRAW_SETTING(altitude);
+
+#if AP_TERRAIN_AVAILABLE
+    DRAW_SETTING(hgt_abvterr);
+#endif
+
+    DRAW_SETTING(rngf);
     DRAW_SETTING(waypoint);
     DRAW_SETTING(xtrack_error);
     DRAW_SETTING(bat_volt);
     DRAW_SETTING(bat2_vlt);
+    DRAW_SETTING(avgcellvolt);
+    DRAW_SETTING(restvolt);
     DRAW_SETTING(rssi);
     DRAW_SETTING(current);
     DRAW_SETTING(batused);
@@ -1887,6 +2043,7 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(heading);
     DRAW_SETTING(wind);
     DRAW_SETTING(home);
+    DRAW_SETTING(fence);
     DRAW_SETTING(roll_angle);
     DRAW_SETTING(pitch_angle);
     DRAW_SETTING(temp);
@@ -1897,7 +2054,7 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(clk);
     DRAW_SETTING(vtx_power);
 
-#ifdef HAVE_AP_BLHELI_SUPPORT
+#if HAL_WITH_ESC_TELEM
     DRAW_SETTING(blh_temp);
     DRAW_SETTING(blh_rpm);
     DRAW_SETTING(blh_amps);

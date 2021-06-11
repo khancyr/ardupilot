@@ -22,6 +22,7 @@
 #include <AP_InternalError/AP_InternalError.h>
 #include "hwdef/common/watchdog.h"
 #include "hwdef/common/stm32_util.h"
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include <ch.h>
 #include "hal.h"
@@ -80,7 +81,7 @@ static void save_fault_watchdog(uint16_t line, FaultType fault_type, uint32_t fa
             pd.fault_addr = fault_addr;
             thread_t *tp = chThdGetSelfX();
             if (tp) {
-                pd.fault_thd_prio = tp->prio;
+                pd.fault_thd_prio = tp->hdr.pqueue.prio;
                 // get first 4 bytes of the name, but only of first fault
                 if (tp->name && pd.thread_name4[0] == 0) {
                     strncpy_noterm(pd.thread_name4, tp->name, 4);
@@ -233,7 +234,7 @@ void init()
 
 void panic(const char *errormsg, ...)
 {
-#if !defined(HAL_BOOTLOADER_BUILD) && !defined(HAL_NO_LOGGING)
+#if !defined(HAL_BOOTLOADER_BUILD) && !APM_BUILD_TYPE(APM_BUILD_iofirmware)
     INTERNAL_ERROR(AP_InternalError::error_t::panic);
     va_list ap;
 

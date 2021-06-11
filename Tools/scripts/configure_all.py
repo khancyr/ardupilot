@@ -32,7 +32,7 @@ def get_board_list():
     '''add boards based on existance of hwdef-bl.dat in subdirectories for ChibiOS'''
     board_list = []
     # these are base builds, and don't build directly
-    omit = ['f103-periph', 'f303-periph']
+    omit = []
     dirname, dirlist, filenames = next(os.walk('libraries/AP_HAL_ChibiOS/hwdef'))
     for d in dirlist:
         hwdef = os.path.join(dirname, d, 'hwdef.dat')
@@ -61,6 +61,18 @@ if args.start is not None:
         sys.exit(1)
     board_list = board_list[args.start-1:]
 
+def is_ap_periph(board):
+    hwdef = os.path.join('libraries/AP_HAL_ChibiOS/hwdef/%s/hwdef.dat' % board)
+    try:
+        r = open(hwdef, 'r').read()
+        if r.find('periph/hwdef.dat') != -1 or r.find('AP_PERIPH') != -1:
+            print("%s is AP_Periph" % board)
+            return True
+    except Exception as ex:
+        pass
+    return False
+
+
 for board in board_list:
     done.append(board)
     print("Configuring for %s [%u/%u failed=%u]" % (board, len(done), len(board_list), len(failures)))
@@ -71,7 +83,7 @@ for board in board_list:
     if args.build:
         if board == "iomcu":
             target = "iofirmware"
-        elif board in ['CUAV_GPS', 'ZubaxGNSS'] or board.startswith('f103') or board.startswith('f303'):
+        elif is_ap_periph(board):
             target = "AP_Periph"
         else:
             target = args.build_target

@@ -38,8 +38,8 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: AUTOTUNE_LEVEL
     // @DisplayName: Autotune level
-    // @Description: Level of aggressiveness of pitch and roll PID gains. Lower values result in a 'softer' tune. Level 6 recommended for most planes.
-    // @Range: 1 10
+    // @Description: Level of aggressiveness of pitch and roll PID gains. Lower values result in a 'softer' tune. Level 6 recommended for most planes. A value of 0 means to keep the current values of RMAX and TCONST for the controllers, tuning only the PID values
+    // @Range: 0 10
     // @Increment: 1
     // @User: Standard
     ASCALAR(autotune_level, "AUTOTUNE_LEVEL",  6),
@@ -70,7 +70,7 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: KFF_THR2PTCH
     // @DisplayName: Throttle to Pitch Mix
-    // @Description: Degrees of elevator added for full throttle application. Increase to compensate for throttle causing down pitch.
+    // @Description: Pitch up to add in proportion to throttle. 100% throttle will add this number of degrees to the pitch target.
     // @Range: 0 5
     // @Increment: 0.01
     // @User: Advanced
@@ -194,14 +194,9 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: The amount of flaps (as a percentage) to apply in automatic takeoff
     // @Range: 0 100
     // @Units: %
+    // @Increment: 1
     // @User: Advanced
     GSCALAR(takeoff_flap_percent,     "TKOFF_FLAP_PCNT", 0),
-
-    // @Param: FBWA_TDRAG_CHAN
-    // @DisplayName: FBWA taildragger channel
-    // @Description: This is a RC input channel which when it goes above 1700 enables FBWA taildragger takeoff mode. It should be assigned to a momentary switch. Once this feature is enabled it will stay enabled until the aircraft goes above TKOFF_TDRAG_SPD1 airspeed, changes mode, or the pitch goes above the initial pitch when this is engaged or goes below 0 pitch. When enabled the elevator will be forced to TKOFF_TDRAG_ELEV. This option allows for easier takeoffs on taildraggers in FBWA mode, and also makes it easier to test auto-takeoff steering handling in FBWA. Setting it to 0 disables this option.
-    // @User: Standard
-    GSCALAR(fbwa_tdrag_chan,          "FBWA_TDRAG_CHAN",  0),
 
     // @Param: LEVEL_ROLL_LIMIT
     // @DisplayName: Level flight roll limit
@@ -316,6 +311,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Use terrain following
     // @Description: This enables terrain following for CRUISE mode, FBWB mode, RTL and for rally points. To use this option you also need to set TERRAIN_ENABLE to 1, which enables terrain data fetching from the GCS, and you need to have a GCS that supports sending terrain data to the aircraft. When terrain following is enabled then CRUISE and FBWB mode will hold height above terrain rather than height above home. In RTL the return to launch altitude will be considered to be a height above the terrain. Rally point altitudes will be taken as height above the terrain. This option does not affect mission items, which have a per-waypoint flag for whether they are height above home or height above the terrain. To use terrain following missions you need a ground station which can set the waypoint type to be a terrain height waypoint when creating the mission.
     // @Values: 0:Disabled,1:Enabled
+    // @Bitmask: 0: Enable all modes, 1:FBWB, 2:Cruise, 3:Auto, 4:RTL, 5:Avoid_ADSB, 6:Guided, 7:Loiter, 8:Circle, 9:QRTL, 10:QLand, 11:Qloiter
     // @User: Standard
     GSCALAR(terrain_follow, "TERRAIN_FOLLOW",  0),
 
@@ -470,6 +466,8 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: FLTMODE_CH
     // @DisplayName: Flightmode channel
     // @Description: RC Channel to use for flight mode control
+    // @Range: 1 16
+    // @Increment: 1
     // @User: Advanced
     GSCALAR(flight_mode_channel,    "FLTMODE_CH",     FLIGHT_MODE_CHANNEL),
 
@@ -527,7 +525,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: Maximum bank angle commanded in modes with stabilized limits. Increase this value for sharper turns, but decrease to prevent accelerated stalls.
     // @Units: cdeg
     // @Range: 0 9000
-    // @Increment: 1
+    // @Increment: 10
     // @User: Standard
     ASCALAR(roll_limit_cd,          "LIM_ROLL_CD",    HEAD_MAX_CENTIDEGREE),
 
@@ -536,7 +534,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: Maximum pitch up angle commanded in modes with stabilized limits.
     // @Units: cdeg
     // @Range: 0 9000
-    // @Increment: 1
+    // @Increment: 10
     // @User: Standard
     ASCALAR(pitch_limit_max_cd,     "LIM_PITCH_MAX",  PITCH_MAX_CENTIDEGREE),
 
@@ -545,7 +543,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: Maximum pitch down angle commanded in modes with stabilized limits
     // @Units: cdeg
     // @Range: -9000 0
-    // @Increment: 1
+    // @Increment: 10
     // @User: Standard
     ASCALAR(pitch_limit_min_cd,     "LIM_PITCH_MIN",  PITCH_MIN_CENTIDEGREE),
 
@@ -644,18 +642,6 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(log_bitmask,            "LOG_BITMASK",    DEFAULT_LOG_BITMASK),
 
-    // @Param: RST_SWITCH_CH
-    // @DisplayName: Reset Switch Channel
-    // @Description: RC channel to use to reset to last flight mode	after geofence takeover.
-    // @User: Advanced
-    GSCALAR(reset_switch_chan,      "RST_SWITCH_CH",  0),
-
-    // @Param: RST_MISSION_CH
-    // @DisplayName: Reset Mission Channel
-    // @Description: Enables a channel to reset the mission to the first waypoint. Mission restart is triggered by channel rising above 1750 PWM. 0 disables.
-    // @User: Advanced
-    GSCALAR(reset_mission_chan,      "RST_MISSION_CH",  0),
-
     // @Param: TRIM_ARSPD_CM
     // @DisplayName: Target airspeed
     // @Description: Target airspeed in cm/s in automatic throttle modes. Value is as an indicated (calibrated/apparent) airspeed.
@@ -667,6 +653,8 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: speed used for speed scaling calculations
     // @Description: Airspeed in m/s to use when calculating surface speed scaling. Note that changing this value will affect all PID values
     // @Units: m/s
+    // @Range: 0 50
+    // @Increment: 0.1
     // @User: Advanced
     GSCALAR(scaling_speed,        "SCALING_SPEED",    SCALING_SPEED),
 
@@ -681,6 +669,8 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Pitch angle offset
     // @Description: Offset applied to AHRS pitch used for in-flight pitch trimming. Correct ground leveling is better than changing this parameter.
     // @Units: cdeg
+    // @Range: -4500 4500
+    // @Increment: 10
     // @User: Advanced
     GSCALAR(pitch_trim_cd,        "TRIM_PITCH_CD",  0),
 
@@ -702,6 +692,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @DisplayName: Flap 1 percentage
     // @Description: The percentage change in flap position when FLAP_1_SPEED is reached. Use zero to disable flaps
     // @Range: 0 100
+    // @Increment: 1
     // @Units: %
     // @User: Advanced
     GSCALAR(flap_1_percent,         "FLAP_1_PERCNT",  FLAP_1_PERCENT),
@@ -720,6 +711,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: The percentage change in flap position when FLAP_2_SPEED is reached. Use zero to disable flaps
     // @Range: 0 100
 	// @Units: %
+    // @Increment: 1
     // @User: Advanced
     GSCALAR(flap_2_percent,         "FLAP_2_PERCNT",  FLAP_2_PERCENT),
 
@@ -736,6 +728,8 @@ const AP_Param::Info Plane::var_info[] = {
     // @Param: OVERRIDE_CHAN
     // @DisplayName: IO override channel
     // @Description: If set to a non-zero value then this is an RC input channel number to use for giving IO manual control in case the main FMU microcontroller on a board with a IO co-processor fails. When this RC input channel goes above 1750 the FMU microcontroller will no longer be involved in controlling the servos and instead the IO microcontroller will directly control the servos. Note that IO manual control will be automatically activated if the FMU crashes for any reason. This parameter allows you to test for correct manual behaviour without actually crashing the FMU. This parameter is can be set to a non-zero value either for ground testing purposes or for giving the effect of an external override control board. Please also see the docs on OVERRIDE_SAFETY. Note that you may set OVERRIDE_CHAN to the same channel as FLTMODE_CH to get IO based override when in flight mode 6. Note that when override is triggered due to a FMU crash the 6 auxiliary output channels on Pixhawk will no longer be updated, so all the flight controls you need must be assigned to the first 8 channels.
+    // @Range: 0 16
+    // @Increment: 1
     // @User: Advanced
     GSCALAR(override_channel,      "OVERRIDE_CHAN",  0),
 
@@ -784,6 +778,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Description: X-Axis deceleration threshold to notify the crash detector that there was a possible impact which helps disarm the motor quickly after a crash. This value should be much higher than normal negative x-axis forces during normal flight, check flight log files to determine the average IMU.x values for your aircraft and motor type. Higher value means less sensative (triggers on higher impact). For electric planes that don't vibrate much during fight a value of 25 is good (that's about 2.5G). For petrol/nitro planes you'll want a higher value. Set to 0 to disable the collision detector.
     // @Units: m/s/s
     // @Range: 10 127
+    // @Increment: 1
     // @User: Advanced
     GSCALAR(crash_accel_threshold,          "CRASH_ACC_THRESH",   0),
 
@@ -800,9 +795,9 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(barometer, "BARO", AP_Baro),
 
     // GPS driver
-    // @Group: GPS_
+    // @Group: GPS
     // @Path: ../libraries/AP_GPS/AP_GPS.cpp
-    GOBJECT(gps, "GPS_", AP_GPS),
+    GOBJECT(gps, "GPS", AP_GPS),
 
 #if CAMERA == ENABLED
     // @Group: CAM_
@@ -822,12 +817,6 @@ const AP_Param::Info Plane::var_info[] = {
 	// @Group: CHUTE_
     // @Path: ../libraries/AP_Parachute/AP_Parachute.cpp
     GOBJECT(parachute,		"CHUTE_", AP_Parachute),
-
-    // @Param: CHUTE_CHAN
-    // @DisplayName: Parachute release channel
-    // @Description: If set to a non-zero value then this is an RC input channel number to use for manually releasing the parachute. When this channel goes above 1700 the parachute will be released
-    // @User: Advanced
-    GSCALAR(parachute_channel,      "CHUTE_CHAN",  0),
 #endif
 
     // @Group: RNGFND
@@ -871,13 +860,13 @@ const AP_Param::Info Plane::var_info[] = {
       (const void *)&plane.quadplane.attitude_control,
       {group_info : AC_AttitudeControl_Multi::var_info}, AP_PARAM_FLAG_POINTER },
     
-    // @Group: RLL2SRV_
+    // @Group: RLL
     // @Path: ../libraries/APM_Control/AP_RollController.cpp
-	GOBJECT(rollController,         "RLL2SRV_",   AP_RollController),
+    GOBJECT(rollController,         "RLL",   AP_RollController),
 
-    // @Group: PTCH2SRV_
+    // @Group: PTCH
     // @Path: ../libraries/APM_Control/AP_PitchController.cpp
-	GOBJECT(pitchController,        "PTCH2SRV_",  AP_PitchController),
+    GOBJECT(pitchController,        "PTCH",  AP_PitchController),
 
     // @Group: YAW2SRV_
     // @Path: ../libraries/APM_Control/AP_YawController.cpp
@@ -1143,7 +1132,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Param: FLIGHT_OPTIONS
     // @DisplayName: Flight mode options
     // @Description: Flight mode specific options
-    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB
+    // @Bitmask: 0:Rudder mixing in direct flight modes only (Manual / Stabilize / Acro),1:Use centered throttle in Cruise or FBWB to indicate trim airspeed, 2:Disable attitude check for takeoff arming, 3:Force target airspeed to trim airspeed in Cruise or FBWB, 4: Climb to ALT_HOLD_RTL before turning for RTL, 5: Enable yaw damper in acro mode, 6: Surpress speed scaling during auto takeoffs to be 1 or less to prevent oscillations without airpseed sensor.
     // @User: Advanced
     AP_GROUPINFO("FLIGHT_OPTIONS", 13, ParametersG2, flight_options, 0),
 
@@ -1210,7 +1199,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("DSPOILER_AILMTCH", 21, ParametersG2, crow_flap_aileron_matching, 100),
 
-#if EFI_ENABLED
+#if HAL_EFI_ENABLED
     // @Group: EFI
     // @Path: ../libraries/AP_EFI/AP_EFI.cpp
     AP_SUBGROUPINFO(efi, "EFI", 22, ParametersG2, AP_EFI),
@@ -1221,6 +1210,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Description: Forward throttle battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust). Recommend 4.2 * cell count, 0 = Disabled. Recommend THR_MAX is set to no more than 100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX, THR_MIN is set to no less than -100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX and climb descent rate limits are set accordingly.
     // @Range: 6 35
     // @Units: V
+    // @Increment: 0.1
     // @User: Advanced
     AP_GROUPINFO("FWD_BAT_VOLT_MAX", 23, ParametersG2, fwd_thr_batt_voltage_max, 0.0f),
 
@@ -1229,6 +1219,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Description: Forward throttle battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count, 0 = Disabled. Recommend THR_MAX is set to no more than 100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX, THR_MIN is set to no less than -100 x FWD_BAT_VOLT_MIN / FWD_BAT_VOLT_MAX and climb descent rate limits are set accordingly.
     // @Range: 6 35
     // @Units: V
+    // @Increment: 0.1
     // @User: Advanced
     AP_GROUPINFO("FWD_BAT_VOLT_MIN", 24, ParametersG2, fwd_thr_batt_voltage_min, 0.0f),
 
@@ -1287,7 +1278,7 @@ ParametersG2::ParametersG2(void) :
   The second column below is the index in the var_info[] table for the
   old object. This should be zero for top level parameters.
  */
-const AP_Param::ConversionInfo conversion_table[] = {
+static const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_log_bitmask_old,    0,      AP_PARAM_INT16, "LOG_BITMASK" },
     { Parameters::k_param_rally_limit_km_old, 0,      AP_PARAM_FLOAT, "RALLY_LIMIT_KM" },
     { Parameters::k_param_rally_total_old,    0,      AP_PARAM_INT8, "RALLY_TOTAL" },
@@ -1339,6 +1330,22 @@ const AP_Param::ConversionInfo conversion_table[] = {
     { Parameters::k_param_fence_autoenable,   0,      AP_PARAM_INT8, "FENCE_AUTOENABLE"},
 };
 
+struct RCConversionInfo {
+    uint16_t old_key; // k_param_*
+    uint32_t old_group_element; // index in old object
+    RC_Channel::AUX_FUNC fun; // new function
+};
+
+static const RCConversionInfo rc_option_conversion[] = {
+    { Parameters::k_param_flapin_channel_old, 0, RC_Channel::AUX_FUNC::FLAP},
+    { Parameters::k_param_g2, 968, RC_Channel::AUX_FUNC::SOARING},
+    { Parameters::k_param_fence_channel, 0, RC_Channel::AUX_FUNC::FENCE},
+    { Parameters::k_param_reset_mission_chan, 0, RC_Channel::AUX_FUNC::MISSION_RESET},
+    { Parameters::k_param_parachute_channel, 0, RC_Channel::AUX_FUNC::PARACHUTE_RELEASE},
+    { Parameters::k_param_fbwa_tdrag_chan, 0, RC_Channel::AUX_FUNC::FBWA_TAILDRAGGER},
+    { Parameters::k_param_reset_switch_chan, 0, RC_Channel::AUX_FUNC::MODE_SWITCH_RESET},
+};
+
 void Plane::load_parameters(void)
 {
     if (!AP_Param::check_var_info()) {
@@ -1381,48 +1388,15 @@ void Plane::load_parameters(void)
 
     AP_Param::set_frame_type_flags(AP_PARAM_FRAME_PLANE);
 
-    // Convert flap to RCx_OPTION
-    AP_Int8 flap_output;
-    AP_Param::ConversionInfo flap_info = {
-        Parameters::k_param_flapin_channel_old,
-        0,
-        AP_PARAM_INT8,
-        nullptr
-    };
-    if (AP_Param::find_old_parameter(&flap_info, &flap_output) && flap_output.get() != 0) {
-        RC_Channel *flapin = rc().channel(flap_output - 1);
-        if (flapin != nullptr && !flapin->option.configured()) {
-            flapin->option.set_and_save((int16_t)RC_Channel::AUX_FUNC::FLAP); // save the new param
-        }
-    }
-
-    // Convert SOAR_ENABLE_CH to RCx_OPTION
-    AP_Int8 soar_enable_ch;
-    AP_Param::ConversionInfo soar_info = {
-        Parameters::k_param_g2,
-        968,
-        AP_PARAM_INT8,
-        nullptr
-    };
-    if (AP_Param::find_old_parameter(&soar_info, &soar_enable_ch) && soar_enable_ch.get() != 0) {
-        RC_Channel *soar_ch = rc().channel(soar_enable_ch - 1);
-        if (soar_ch != nullptr && !soar_ch->option.configured()) {
-            soar_ch->option.set_and_save((int16_t)RC_Channel::AUX_FUNC::SOARING); // save the new param
-        }
-    }
-
-    // Convert fence to RCx_OPTION
-    AP_Int8 fence_enable_ch;
-    AP_Param::ConversionInfo fence_channel_info = {
-        Parameters::k_param_fence_channel,
-        0,
-        AP_PARAM_INT8,
-        nullptr
-    };
-    if (AP_Param::find_old_parameter(&fence_channel_info, &fence_enable_ch) && fence_enable_ch.get() != 0) {
-        RC_Channel *fence_ch = rc().channel(fence_enable_ch - 1);
-        if (fence_ch != nullptr && !fence_ch->option.configured()) {
-            fence_ch->option.set_and_save((int16_t)RC_Channel::AUX_FUNC::FENCE); // save the new param
+    // Convert chan params to RCx_OPTION
+    for (uint8_t i=0; i<ARRAY_SIZE(rc_option_conversion); i++) {
+        AP_Int8 chan_param;
+        AP_Param::ConversionInfo info {rc_option_conversion[i].old_key, rc_option_conversion[i].old_group_element, AP_PARAM_INT8, nullptr};
+        if (AP_Param::find_old_parameter(&info, &chan_param) && chan_param.get() > 0) {
+            RC_Channel *chan = rc().channel(chan_param.get() - 1);
+            if (chan != nullptr && !chan->option.configured()) {
+                chan->option.set_and_save((int16_t)rc_option_conversion[i].fun); // save the new param
+            }
         }
     }
 
@@ -1510,6 +1484,10 @@ void Plane::load_parameters(void)
             }
         }
     }
+
+#if AP_TERRAIN_AVAILABLE
+    g.terrain_follow.convert_parameter_width(AP_PARAM_INT8);
+#endif
 
     hal.console->printf("load_all took %uus\n", (unsigned)(micros() - before));
 }

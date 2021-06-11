@@ -431,8 +431,8 @@ void NavEKF3_core::readIMUData()
     imuDataNew.accel_index = accel_index_active;
     
     // Get delta angle data from primary gyro or primary if not available
-    readDeltaAngle(gyro_index_active, imuDataNew.delAng);
-    imuDataNew.delAngDT = MAX(ins.get_delta_angle_dt(gyro_index_active),1.0e-4f);
+    readDeltaAngle(gyro_index_active, imuDataNew.delAng, imuDataNew.delAngDT);
+    imuDataNew.delAngDT = MAX(imuDataNew.delAngDT, 1.0e-4f);
     imuDataNew.gyro_index = gyro_index_active;
 
     // Get current time stamp
@@ -530,8 +530,8 @@ bool NavEKF3_core::readDeltaVelocity(uint8_t ins_index, Vector3f &dVel, float &d
     const auto &ins = dal.ins();
 
     if (ins_index < ins.get_accel_count()) {
-        ins.get_delta_velocity(ins_index,dVel);
-        dVel_dt = MAX(ins.get_delta_velocity_dt(ins_index),1.0e-4f);
+        ins.get_delta_velocity(ins_index,dVel,dVel_dt);
+        dVel_dt = MAX(dVel_dt,1.0e-4f);
         return true;
     }
     return false;
@@ -710,11 +710,11 @@ void NavEKF3_core::readGpsData()
 
 // read the delta angle and corresponding time interval from the IMU
 // return false if data is not available
-bool NavEKF3_core::readDeltaAngle(uint8_t ins_index, Vector3f &dAng) {
+bool NavEKF3_core::readDeltaAngle(uint8_t ins_index, Vector3f &dAng, float &dAngDT) {
     const auto &ins = dal.ins();
 
     if (ins_index < ins.get_gyro_count()) {
-        ins.get_delta_angle(ins_index,dAng);
+        ins.get_delta_angle(ins_index, dAng, dAngDT);
         return true;
     }
     return false;
@@ -734,12 +734,6 @@ void NavEKF3_core::readBaroData()
     if (baro.get_last_update(selected_baro) - lastBaroReceived_ms > frontend->sensorIntervalMin_ms) {
 
         baroDataNew.hgt = baro.get_altitude(selected_baro);
-
-        // If we are in takeoff mode, the height measurement is limited to be no less than the measurement at start of takeoff
-        // This prevents negative baro disturbances due to rotor wash ground interaction corrupting the EKF altitude during initial ascent
-        if (expectGndEffectTakeoff) {
-            baroDataNew.hgt = MAX(baroDataNew.hgt, meaHgtAtTakeOff);
-        }
 
         // time stamp used to check for new measurement
         lastBaroReceived_ms = baro.get_last_update(selected_baro);
@@ -1319,7 +1313,7 @@ void NavEKF3_core::updateMovementCheck(void)
     }
 
     const float gyro_limit = radians(3.0f);
-    const float gyro_diff_limit = 0.1;
+    const float gyro_diff_limit = 0.2f;
     const float accel_limit = 1.0f;
     const float accel_diff_limit = 5.0f;
     const float hysteresis_ratio = 0.7f;
@@ -1355,18 +1349,18 @@ void NavEKF3_core::updateMovementCheck(void)
     const float accel_diff_ratio = accel_diff / accel_diff_limit;
     bool logStatusChange = false;
     if (onGroundNotMoving) {
-        if (gyro_length_ratio > 1.0f ||
-            fabsf(accel_length_ratio) > 1.0f ||
-            gyro_diff_ratio > 1.0f ||
-            accel_diff_ratio > 1.0f)
+        if (gyro_length_ratio > frontend->_ognmTestScaleFactor ||
+            fabsf(accel_length_ratio) > frontend->_ognmTestScaleFactor ||
+            gyro_diff_ratio > frontend->_ognmTestScaleFactor ||
+            accel_diff_ratio > frontend->_ognmTestScaleFactor)
         {
             onGroundNotMoving = false;
             logStatusChange = true;
         }
-    } else if (gyro_length_ratio < hysteresis_ratio &&
-            fabsf(accel_length_ratio) < hysteresis_ratio &&
-            gyro_diff_ratio < hysteresis_ratio &&
-            accel_diff_ratio < hysteresis_ratio)
+    } else if (gyro_length_ratio < frontend->_ognmTestScaleFactor * hysteresis_ratio &&
+            fabsf(accel_length_ratio) < frontend->_ognmTestScaleFactor * hysteresis_ratio &&
+            gyro_diff_ratio < frontend->_ognmTestScaleFactor * hysteresis_ratio &&
+            accel_diff_ratio < frontend->_ognmTestScaleFactor * hysteresis_ratio)
     {
         onGroundNotMoving = true;
         logStatusChange = true;

@@ -14,7 +14,6 @@
 
 // Yaw imbalance check
 #define YAW_IMBALANCE_IMAX_THRESHOLD 0.75f
-#define YAW_IMBALANCE_I_THERSHOLD 0.1f
 #define YAW_IMBALANCE_WARN_MS 10000
 
 // crash_check - disarms motors if a crash has been detected
@@ -37,14 +36,14 @@ void Copter::crash_check()
     }
 
     // return immediately if we are not in an angle stabilize flight mode or we are flipping
-    if (control_mode == Mode::Number::ACRO || control_mode == Mode::Number::FLIP) {
+    if (flightmode->mode_number() == Mode::Number::ACRO || flightmode->mode_number() == Mode::Number::FLIP) {
         crash_counter = 0;
         return;
     }
 
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     //return immediately if in autorotation mode
-    if (control_mode == Mode::Number::AUTOROTATE) {
+    if (flightmode->mode_number() == Mode::Number::AUTOROTATE) {
         crash_counter = 0;
         return;
     }
@@ -209,8 +208,7 @@ void Copter::yaw_imbalance_check()
     }
 
     const float I_max = attitude_control->get_rate_yaw_pid().imax();
-    if ((is_positive(I_max) && ((I > YAW_IMBALANCE_IMAX_THRESHOLD * I_max) || (is_equal(I_term,I_max)))) ||
-        (I >YAW_IMBALANCE_I_THERSHOLD)) {
+    if ((is_positive(I_max) && ((I > YAW_IMBALANCE_IMAX_THRESHOLD * I_max) || (is_equal(I_term,I_max))))) {
         // filtered using over precentage of I max or unfiltered = I max
         // I makes up more than precentage of total available control power
         const uint32_t now = millis();
@@ -266,7 +264,7 @@ void Copter::parachute_check()
     }
 
     // return immediately if we are not in an angle stabilize flight mode or we are flipping
-    if (control_mode == Mode::Number::ACRO || control_mode == Mode::Number::FLIP) {
+    if (flightmode->mode_number() == Mode::Number::ACRO || flightmode->mode_number() == Mode::Number::FLIP) {
         control_loss_count = 0;
         return;
     }
@@ -329,8 +327,10 @@ void Copter::parachute_release()
     // release parachute
     parachute.release();
 
+#if LANDING_GEAR_ENABLED == ENABLED
     // deploy landing gear
     landinggear.set_position(AP_LandingGear::LandingGear_Deploy);
+#endif
 }
 
 // parachute_manual_release - trigger the release of the parachute, after performing some checks for pilot error

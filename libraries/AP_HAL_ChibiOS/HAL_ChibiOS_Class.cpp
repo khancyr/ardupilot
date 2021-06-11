@@ -161,8 +161,8 @@ void hal_chibios_set_priority(uint8_t priority)
 {
     chSysLock();
 #if CH_CFG_USE_MUTEXES == TRUE
-    if ((daemon_task->prio == daemon_task->realprio) || (priority > daemon_task->prio)) {
-      daemon_task->prio = priority;
+    if ((daemon_task->hdr.pqueue.prio == daemon_task->realprio) || (priority > daemon_task->hdr.pqueue.prio)) {
+      daemon_task->hdr.pqueue.prio = priority;
     }
     daemon_task->realprio = priority;
 #endif
@@ -289,7 +289,7 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
 #endif
 
 #ifdef HAL_STDOUT_SERIAL
-    //STDOUT Initialistion
+    //STDOUT Initialisation
     SerialConfig stdoutcfg =
     {
       HAL_STDOUT_BAUDRATE,
@@ -300,7 +300,6 @@ void HAL_ChibiOS::run(int argc, char * const argv[], Callbacks* callbacks) const
     sdStart((SerialDriver*)&HAL_STDOUT_SERIAL, &stdoutcfg);
 #endif
 
-    assert(callbacks);
     g_callbacks = callbacks;
 
     //Takeover main

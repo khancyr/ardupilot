@@ -79,6 +79,7 @@ class CANIface: public AP_HAL::CANIface
     int8_t _prev_ser_port;
     int8_t _iface_num = -1;
     uint32_t _last_had_activity;
+    uint8_t num_tries;
     AP_HAL::CANIface* _can_iface; // Can interface to be used for interaction by SLCAN interface
     HAL_Semaphore port_sem;
     bool _set_by_sermgr;
@@ -98,9 +99,6 @@ public:
 
     // Initialisation of SLCAN Passthrough method of operation
     bool init_passthrough(uint8_t i);
-
-    // Set UART port to be used with slcan interface
-    int set_port(AP_HAL::UARTDriver* port);
 
     void reset_params();
     int8_t get_iface_num() const

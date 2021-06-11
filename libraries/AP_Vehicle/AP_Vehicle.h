@@ -183,6 +183,7 @@ public:
     */
     virtual bool start_takeoff(float alt) { return false; }
     virtual bool set_target_location(const Location& target_loc) { return false; }
+    virtual bool set_target_posvel_NED(const Vector3f& target_pos, const Vector3f& target_vel) { return false; }
     virtual bool set_target_velocity_NED(const Vector3f& vel_ned) { return false; }
     virtual bool set_target_angle_and_climbrate(float roll_deg, float pitch_deg, float yaw_deg, float climb_rate_ms, bool use_yaw_rate, float yaw_rate_degs) { return false; }
 
@@ -306,7 +307,9 @@ protected:
     AP_VisualOdom visual_odom;
 #endif
 
+#if HAL_WITH_ESC_TELEM
     AP_ESC_Telem esc_telem;
+#endif
 
 #if HAL_MSP_ENABLED
     AP_MSP msp;
@@ -342,8 +345,12 @@ private:
     // statustext:
     void send_watchdog_reset_statustext();
 
+    // run notch update at either loop rate or 200Hz
+    void update_dynamic_notch_at_specified_rate();
+
     bool likely_flying;         // true if vehicle is probably flying
     uint32_t _last_flying_ms;   // time when likely_flying last went true
+    uint32_t _last_notch_update_ms; // last time update_dynamic_notch() was run
 
     static AP_Vehicle *_singleton;
 

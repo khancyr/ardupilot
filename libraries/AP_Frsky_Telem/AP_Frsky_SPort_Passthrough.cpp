@@ -8,6 +8,8 @@
 #include <AP_Notify/AP_Notify.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
 #include <AP_RPM/AP_RPM.h>
+#include <AP_Terrain/AP_Terrain.h>
+#include <AC_Fence/AC_Fence.h>
 #include <GCS_MAVLink/GCS.h>
 
 #if HAL_WITH_FRSKY_TELEM_BIDIRECTIONAL
@@ -42,6 +44,10 @@ for FrSky SPort Passthrough
 #define AP_ARMED_OFFSET             8
 #define AP_BATT_FS_OFFSET           9
 #define AP_EKF_FS_OFFSET            10
+#define AP_FS_OFFSET                12
+#define AP_FENCE_PRESENT_OFFSET     13
+#define AP_FENCE_BREACH_OFFSET      14
+#define AP_THROTTLE_OFFSET          19
 #define AP_IMU_TEMP_MIN             19.0f
 #define AP_IMU_TEMP_MAX             82.0f
 #define AP_IMU_TEMP_OFFSET          26
@@ -58,7 +64,8 @@ for FrSky SPort Passthrough
 #define ATTIANDRNG_PITCH_LIMIT      0x3FF
 #define ATTIANDRNG_PITCH_OFFSET     11
 #define ATTIANDRNG_RNGFND_OFFSET    21
-
+// for terrain data
+#define TERRAIN_UNHEALTHY_OFFSET    13
 extern const AP_HAL::HAL& hal;
 
 AP_Frsky_SPort_Passthrough *AP_Frsky_SPort_Passthrough::singleton;
@@ -112,7 +119,11 @@ void AP_Frsky_SPort_Passthrough::setup_wfq_scheduler(void)
     set_scheduler_entry(BATT_1, 1300, 500);     // 0x5003 Battery 1 status
     set_scheduler_entry(PARAM, 1700, 1000);     // 0x5007 parameters
     set_scheduler_entry(RPM, 300, 330);         // 0x500A rpm sensors 1 and 2
+    set_scheduler_entry(TERRAIN, 700, 500);     // 0x500B terrain data
     set_scheduler_entry(UDATA, 5000, 200);      // user data
+
+    // initialize default sport sensor ID
+    set_sensor_id(_frsky_parameters->_dnlink_id, downlink_sensor_id);
 #if HAL_WITH_FRSKY_TELEM_BIDIRECTIONAL
     set_scheduler_entry(MAV, 35, 25);           // mavlite
     // initialize sport sensor IDs
@@ -181,8 +192,8 @@ bool AP_Frsky_SPort_Passthrough::is_packet_ready(uint8_t idx, bool queue_empty)
         break;
     case GPS_LAT:
     case GPS_LON:
-        // force gps coords to use sensor 0x1B, always send when used with external data
-        packet_ready = _use_external_data || (_passthrough.new_byte == SENSOR_ID_27);
+        // force gps coords to use default sensor ID, always send when used with external data
+        packet_ready = _use_external_data || (_passthrough.new_byte == downlink_sensor_id);
         break;
     case AP_STATUS:
         packet_ready = gcs().vehicle_initialised();
@@ -198,6 +209,15 @@ bool AP_Frsky_SPort_Passthrough::is_packet_ready(uint8_t idx, bool queue_empty)
                 break;
             }
             packet_ready = rpm->num_sensors() > 0;
+        }
+        break;
+    case TERRAIN:
+        {
+            packet_ready = false;
+#if AP_TERRAIN_AVAILABLE
+            const AP_Terrain *terrain = AP::terrain();
+            packet_ready = terrain && terrain->enabled();
+#endif
         }
         break;
     case UDATA:
@@ -268,6 +288,9 @@ void AP_Frsky_SPort_Passthrough::process_packet(uint8_t idx)
         break;
     case RPM: // 0x500A rpm sensors 1 and 2
         send_sport_frame(SPORT_DATA_FRAME, DIY_FIRST_ID+0x0A, calc_rpm());
+        break;
+    case TERRAIN: // 0x500B terrain data
+        send_sport_frame(SPORT_DATA_FRAME, DIY_FIRST_ID+0x0B, calc_terrain());
         break;
     case UDATA: // user data
         {
@@ -393,35 +416,35 @@ bool AP_Frsky_SPort_Passthrough::get_next_msg_chunk(void)
  */
 uint32_t AP_Frsky_SPort_Passthrough::calc_param(void)
 {
-    const AP_BattMonitor &_battery = AP::battery();
+    uint8_t param_id = _paramID;    //cache it because it gets changed inside the switch
+    uint32_t param_value = 0;
 
-    uint32_t param = 0;
-    uint8_t last_param = AP::battery().num_instances() > 1 ? BATT_CAPACITY_2 : BATT_CAPACITY_1;
-
-    // cycle through paramIDs
-    if (_paramID >= last_param) {
-        _paramID = 0;
-    }
-
-    _paramID++;
     switch (_paramID) {
+    case NONE:
     case FRAME_TYPE:
-        param = gcs().frame_type(); // see MAV_TYPE in Mavlink definition file common.h
+        param_value = gcs().frame_type(); // see MAV_TYPE in Mavlink definition file common.h
+        _paramID = BATT_CAPACITY_1;
         break;
-    case BATT_FS_VOLTAGE:           // was used to send the battery failsafe voltage, lend slot to next param
-    case BATT_FS_CAPACITY:          // was used to send the battery failsafe capacity in mAh, lend slot to next param
     case BATT_CAPACITY_1:
-        _paramID = 4;
-        param = (uint32_t)roundf(_battery.pack_capacity_mah(0)); // battery pack capacity in mAh
+        param_value = (uint32_t)roundf(AP::battery().pack_capacity_mah(0)); // battery pack capacity in mAh
+        _paramID = AP::battery().num_instances() > 1 ? BATT_CAPACITY_2 : TELEMETRY_FEATURES;
         break;
     case BATT_CAPACITY_2:
-        param = (uint32_t)roundf(_battery.pack_capacity_mah(1)); // battery pack capacity in mAh
+        param_value = (uint32_t)roundf(AP::battery().pack_capacity_mah(1)); // battery pack capacity in mAh
+        _paramID = TELEMETRY_FEATURES;
+        break;
+    case TELEMETRY_FEATURES:
+#if HAL_WITH_FRSKY_TELEM_BIDIRECTIONAL
+        BIT_SET(param_value,PassthroughFeatures::BIDIR);
+#endif
+#ifdef ENABLE_SCRIPTING
+        BIT_SET(param_value,PassthroughFeatures::SCRIPTING);
+#endif
+        _paramID = FRAME_TYPE;
         break;
     }
     //Reserve first 8 bits for param ID, use other 24 bits to store parameter value
-    param = (_paramID << PARAM_ID_OFFSET) | (param & PARAM_VALUE_LIMIT);
-
-    return param;
+    return (param_id << PARAM_ID_OFFSET) | (param_value & PARAM_VALUE_LIMIT);
 }
 
 /*
@@ -482,7 +505,7 @@ bool AP_Frsky_SPort_Passthrough::is_passthrough_byte(const uint8_t byte) const
         return true;
     }
 #endif
-    return byte == SENSOR_ID_27;
+    return byte == downlink_sensor_id;
 }
 
 /*
@@ -507,6 +530,22 @@ uint32_t AP_Frsky_SPort_Passthrough::calc_ap_status(void)
     ap_status |= (uint8_t)(AP_Notify::flags.failsafe_battery)<<AP_BATT_FS_OFFSET;
     // bad ekf flag
     ap_status |= (uint8_t)(AP_Notify::flags.ekf_bad)<<AP_EKF_FS_OFFSET;
+    // generic failsafe
+    ap_status |= (uint8_t)(AP_Notify::flags.failsafe_battery||AP_Notify::flags.failsafe_ekf||AP_Notify::flags.failsafe_gcs||AP_Notify::flags.failsafe_radio)<<AP_FS_OFFSET;
+    // fence status
+    AC_Fence *fence = AP::fence();
+    if (fence != nullptr) {
+        ap_status |= (uint8_t)(fence->enabled() && fence->present()) << AP_FENCE_PRESENT_OFFSET;
+        ap_status |= (uint8_t)(fence->get_breaches()>0) << AP_FENCE_BREACH_OFFSET;
+    }
+    // signed throttle [-100,100] scaled down to [-63,63] on 7 bits, MSB for sign + 6 bits for 0-63
+    int16_t throttle = gcs().get_hud_throttle();
+    uint8_t scaled_throttle = constrain_int16(abs(throttle*0.63f),0,63);
+    // add sign
+    if (throttle < 0) {
+        scaled_throttle |= 0x1<<6;
+    }
+    ap_status |= scaled_throttle<<AP_THROTTLE_OFFSET;
     // IMU temperature
     ap_status |= imu_temp << AP_IMU_TEMP_OFFSET;
     return ap_status;
@@ -613,6 +652,29 @@ uint32_t AP_Frsky_SPort_Passthrough::calc_rpm(void)
     if (ap_rpm->get_rpm(1,rpm)) {
         value |= (int16_t)roundf(rpm * 0.1) << 16;
     }
+    return value;
+}
+
+/*
+ * prepare terrain data
+ * for FrSky SPort Passthrough (OpenTX) protocol (X-receivers)
+ */
+uint32_t AP_Frsky_SPort_Passthrough::calc_terrain(void)
+{
+    uint32_t value = 0;
+#if AP_TERRAIN_AVAILABLE
+    AP_Terrain *terrain = AP::terrain();
+    if (terrain == nullptr || !terrain->enabled()) {
+        return value;
+    }
+    float height_above_terrain;
+    if (terrain->height_above_terrain(height_above_terrain, true)) {
+        // vehicle height above terrain
+        value |= prep_number(roundf(height_above_terrain * 10), 3, 2);
+    }
+    // terrain unhealthy flag
+    value |= (uint8_t)(terrain->status() == AP_Terrain::TerrainStatus::TerrainStatusUnhealthy) << TERRAIN_UNHEALTHY_OFFSET;
+#endif
     return value;
 }
 

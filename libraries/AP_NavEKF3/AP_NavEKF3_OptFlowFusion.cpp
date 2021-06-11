@@ -25,6 +25,8 @@ void NavEKF3_core::SelectFlowFusion()
         optFlowFusionDelayed = false;
     }
 
+    of_elements ofDataDelayed;      // OF data at the fusion time horizon
+
     // Check for data at the fusion time horizon
     const bool flowDataToFuse = storedOF.recall(ofDataDelayed, imuDataDelayed.time_ms);
 
@@ -47,7 +49,7 @@ void NavEKF3_core::SelectFlowFusion()
     // if have valid flow or range measurements, fuse data into a 1-state EKF to estimate terrain height
     if (((flowDataToFuse && (frontend->_flowUse == FLOW_USE_TERRAIN)) || rangeDataToFuse) && tiltOK) {
         // Estimate the terrain offset (runs a one state EKF)
-        EstimateTerrainOffset();
+        EstimateTerrainOffset(ofDataDelayed);
     }
 
     // Fuse optical flow data into the main filter
@@ -56,7 +58,7 @@ void NavEKF3_core::SelectFlowFusion()
             // Set the flow noise used by the fusion processes
             R_LOS = sq(MAX(frontend->_flowNoise, 0.05f));
             // Fuse the optical flow X and Y axis data into the main filter sequentially
-            FuseOptFlow();
+            FuseOptFlow(ofDataDelayed);
         }
     }
 }
@@ -66,7 +68,7 @@ Estimation of terrain offset using a single state EKF
 The filter can fuse motion compensated optical flow rates and range finder measurements
 Equations generated using https://github.com/PX4/ecl/tree/master/EKF/matlab/scripts/Terrain%20Estimator
 */
-void NavEKF3_core::EstimateTerrainOffset()
+void NavEKF3_core::EstimateTerrainOffset(const of_elements &ofDataDelayed)
 {
     // horizontal velocity squared
     float velHorizSq = sq(stateStruct.velocity.x) + sq(stateStruct.velocity.y);
@@ -264,7 +266,7 @@ void NavEKF3_core::EstimateTerrainOffset()
  * https://github.com/PX4/ecl/blob/master/matlab/scripts/Inertial%20Nav%20EKF/GenerateNavFilterEquations.m
  * Requires a valid terrain height estimate.
 */
-void NavEKF3_core::FuseOptFlow()
+void NavEKF3_core::FuseOptFlow(const of_elements &ofDataDelayed)
 {
     Vector24 H_LOS;
     Vector3f relVelSensor;
@@ -466,9 +468,14 @@ void NavEKF3_core::FuseOptFlow()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = t78*(P[13][0]*t2*t5-P[13][4]*t2*t7+P[13][1]*t2*t15+P[13][6]*t2*t10+P[13][2]*t2*t19-P[13][3]*t2*t22+P[13][5]*t2*t27);
-                Kfusion[14] = t78*(P[14][0]*t2*t5-P[14][4]*t2*t7+P[14][1]*t2*t15+P[14][6]*t2*t10+P[14][2]*t2*t19-P[14][3]*t2*t22+P[14][5]*t2*t27);
-                Kfusion[15] = t78*(P[15][0]*t2*t5-P[15][4]*t2*t7+P[15][1]*t2*t15+P[15][6]*t2*t10+P[15][2]*t2*t19-P[15][3]*t2*t22+P[15][5]*t2*t27);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = t78*(P[stateIndex][0]*t2*t5-P[stateIndex][4]*t2*t7+P[stateIndex][1]*t2*t15+P[stateIndex][6]*t2*t10+P[stateIndex][2]*t2*t19-P[stateIndex][3]*t2*t22+P[stateIndex][5]*t2*t27);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);
@@ -637,9 +644,14 @@ void NavEKF3_core::FuseOptFlow()
             }
 
             if (!inhibitDelVelBiasStates) {
-                Kfusion[13] = -t78*(P[13][0]*t2*t5+P[13][5]*t2*t8-P[13][6]*t2*t10+P[13][1]*t2*t16-P[13][2]*t2*t19+P[13][3]*t2*t22+P[13][4]*t2*t27);
-                Kfusion[14] = -t78*(P[14][0]*t2*t5+P[14][5]*t2*t8-P[14][6]*t2*t10+P[14][1]*t2*t16-P[14][2]*t2*t19+P[14][3]*t2*t22+P[14][4]*t2*t27);
-                Kfusion[15] = -t78*(P[15][0]*t2*t5+P[15][5]*t2*t8-P[15][6]*t2*t10+P[15][1]*t2*t16-P[15][2]*t2*t19+P[15][3]*t2*t22+P[15][4]*t2*t27);
+                for (uint8_t index = 0; index < 3; index++) {
+                    const uint8_t stateIndex = index + 13;
+                    if (!dvelBiasAxisInhibit[index]) {
+                        Kfusion[stateIndex] = -t78*(P[stateIndex][0]*t2*t5+P[stateIndex][5]*t2*t8-P[stateIndex][6]*t2*t10+P[stateIndex][1]*t2*t16-P[stateIndex][2]*t2*t19+P[stateIndex][3]*t2*t22+P[stateIndex][4]*t2*t27);
+                    } else {
+                        Kfusion[stateIndex] = 0.0f;
+                    }
+                }
             } else {
                 // zero indexes 13 to 15 = 3*4 bytes
                 memset(&Kfusion[13], 0, 12);

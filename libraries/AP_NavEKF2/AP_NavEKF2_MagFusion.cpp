@@ -148,14 +148,14 @@ void NavEKF2_core::controlMagYawReset()
 
                 // send initial alignment status to console
                 if (!yawAlignComplete) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF2 IMU%u initial yaw alignment complete",(unsigned)imu_index);
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF2 IMU%u MAG%u initial yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
                 }
 
                 // send in-flight yaw alignment status to console
                 if (finalResetRequest) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF2 IMU%u in-flight yaw alignment complete",(unsigned)imu_index);
+                    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF2 IMU%u MAG%u in-flight yaw alignment complete",(unsigned)imu_index, (unsigned)magSelectIndex);
                 } else if (interimResetRequest) {
-                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF2 IMU%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index);
+                    GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "EKF2 IMU%u MAG%u ground mag anomaly, yaw re-aligned",(unsigned)imu_index, (unsigned)magSelectIndex);
                 }
 
                 // update the yaw reset completed status
@@ -689,8 +689,8 @@ void NavEKF2_core::FuseMagnetometer()
                 MagTableConstrain();
             }
 
-            // the first 3 states represent the angular misalignment vector. This is
-            // is used to correct the estimated quaternion on the current time step
+            // the first 3 states represent the angular misalignment vector.
+            // This is used to correct the estimated quaternion on the current time step
             stateStruct.quat.rotate(stateStruct.angErr);
 
         } else {
@@ -964,8 +964,8 @@ void NavEKF2_core::fuseEulerYaw()
             statesArray[i] -= Kfusion[i] * innovation;
         }
 
-        // the first 3 states represent the angular misalignment vector. This is
-        // is used to correct the estimated quaternion on the current time step
+        // the first 3 states represent the angular misalignment vector.
+        // This is used to correct the estimated quaternion on the current time step
         stateStruct.quat.rotate(stateStruct.angErr);
 
         // record fusion event
@@ -1095,8 +1095,8 @@ void NavEKF2_core::FuseDeclination(float declErr)
             statesArray[j] = statesArray[j] - Kfusion[j] * innovation;
         }
 
-        // the first 3 states represent the angular misalignment vector. This is
-        // is used to correct the estimated quaternion on the current time step
+        // the first 3 states represent the angular misalignment vector.
+        // This is used to correct the estimated quaternion on the current time step
         stateStruct.quat.rotate(stateStruct.angErr);
 
         // record fusion health status

@@ -78,6 +78,7 @@ class AP_GPS
     friend class AP_GPS_SIRF;
     friend class AP_GPS_UBLOX;
     friend class AP_GPS_Backend;
+    friend class AP_GPS_UAVCAN;
 
 public:
     AP_GPS();
@@ -498,6 +499,10 @@ public:
     // returns true if all GPS instances have passed all final arming checks/state changes
     bool prepare_for_arming(void);
 
+    // returns true if all GPS backend drivers haven't seen any failure
+    // this is for backends to be able to spout pre arm error messages
+    bool backends_healthy(char failure_msg[], uint16_t failure_msg_len);
+
     // returns false if any GPS drivers are not performing their logging appropriately
     bool logging_failed(void) const;
 
@@ -525,6 +530,15 @@ public:
     // get iTOW, if supported, zero otherwie
     uint32_t get_itow(uint8_t instance) const;
 
+    bool get_error_codes(uint8_t instance, uint32_t &error_codes) const;
+    bool get_error_codes(uint32_t &error_codes) const { return get_error_codes(primary_instance, error_codes); }
+
+    enum class SBAS_Mode : int8_t {
+        Disabled = 0,
+        Enabled = 1,
+        DoNotChange = 2,
+    };
+
 protected:
 
     // configuration parameters
@@ -535,7 +549,7 @@ protected:
     AP_Int16 _sbp_logmask;
     AP_Int8 _inject_to;
     uint32_t _last_instance_swap_ms;
-    AP_Int8 _sbas_mode;
+    AP_Enum<SBAS_Mode> _sbas_mode;
     AP_Int8 _min_elevation;
     AP_Int8 _raw_data;
     AP_Int8 _gnss_mode[GPS_MAX_RECEIVERS];
@@ -549,7 +563,10 @@ protected:
     AP_Float _blend_tc;
     AP_Int16 _driver_options;
     AP_Int8 _primary;
-
+#if GPS_MAX_RECEIVERS > 1 && HAL_ENABLE_LIBUAVCAN_DRIVERS
+    AP_Int32 _node_id[GPS_MAX_RECEIVERS];
+    AP_Int32 _override_node_id[GPS_MAX_RECEIVERS];
+#endif
 #if GPS_MOVING_BASELINE
     MovingBase mb_params[GPS_MAX_RECEIVERS];
 #endif // GPS_MOVING_BASELINE

@@ -164,9 +164,14 @@ public:
     }
 
     Quaternion operator*(const Quaternion &v) const;
+
+    Vector3f operator*(const Vector3f &v) const;
     Quaternion &operator*=(const Quaternion &v);
     Quaternion operator/(const Quaternion &v) const;
 
     // angular difference between quaternions
     Quaternion angular_difference(const Quaternion &v) const;
+
+    // absolute (e.g. always positive) earth-frame roll-pitch difference (in radians) between this Quaternion and another
+    float roll_pitch_difference(const Quaternion &v) const;
 };

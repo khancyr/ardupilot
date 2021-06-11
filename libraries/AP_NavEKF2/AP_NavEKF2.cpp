@@ -1233,40 +1233,6 @@ void NavEKF2::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &raw
     }
 }
 
-// called by vehicle code to specify that a takeoff is happening
-// causes the EKF to compensate for expected barometer errors due to ground effect
-void NavEKF2::setTakeoffExpected(bool val)
-{
-    if (val) {
-        AP::dal().log_event2(AP_DAL::Event::setTakeoffExpected);
-    } else {
-        AP::dal().log_event2(AP_DAL::Event::unsetTakeoffExpected);
-    }
-
-    if (core) {
-        for (uint8_t i=0; i<num_cores; i++) {
-            core[i].setTakeoffExpected(val);
-        }
-    }
-}
-
-// called by vehicle code to specify that a touchdown is expected to happen
-// causes the EKF to compensate for expected barometer errors due to ground effect
-void NavEKF2::setTouchdownExpected(bool val)
-{
-    if (val) {
-        AP::dal().log_event2(AP_DAL::Event::setTouchdownExpected);
-    } else {
-        AP::dal().log_event2(AP_DAL::Event::unsetTouchdownExpected);
-    }
-
-    if (core) {
-        for (uint8_t i=0; i<num_cores; i++) {
-            core[i].setTouchdownExpected(val);
-        }
-    }
-}
-
 // Set to true if the terrain underneath is stable enough to be used as a height reference
 // in combination with a range finder. Set to false if the terrain underneath the vehicle
 // cannot be used as a height reference. Use to prevent range finder operation otherwise
@@ -1370,7 +1336,7 @@ uint32_t NavEKF2::getLastYawResetAngle(float &yawAngDelta)
     uint32_t lastYawReset_ms = yaw_reset_data.last_primary_change;
 
     // There has been a change notification in the primary core that the controller has not consumed
-    // or this is a repeated acce
+    // or this is a repeated access
     if (yaw_reset_data.core_changed || yaw_reset_data.last_function_call == now_time_ms) {
         yawAngDelta = yaw_reset_data.core_delta;
         yaw_reset_data.core_changed = false;

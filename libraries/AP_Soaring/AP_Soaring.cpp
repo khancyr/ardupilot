@@ -149,9 +149,6 @@ SoaringController::SoaringController(AP_SpdHgtControl &spdHgt, const AP_Vehicle:
     _throttle_suppressed(true)
 {
     AP_Param::setup_object_defaults(this, var_info);
-
-    _position_x_filter = LowPassFilter<float>(1.0/60.0);
-    _position_y_filter = LowPassFilter<float>(1.0/60.0);
 }
 
 void SoaringController::get_target(Location &wp)
@@ -371,7 +368,7 @@ void SoaringController::update_cruising()
 
 void SoaringController::update_vario()
 {
-    _vario.update(polar_K, polar_CD0, polar_B);
+    _vario.update(thermal_bank, polar_K, polar_CD0, polar_B);
 }
 
 
@@ -405,20 +402,19 @@ void SoaringController::update_active_state()
             case ActiveStatus::MANUAL_MODE_CHANGE:
                 // It's enabled, but wasn't on the last loop.
                 gcs().send_text(MAV_SEVERITY_INFO, "Soaring: Enabled, manual mode changes.");
-                set_throttle_suppressed(true);
-
-                // We changed mode - if we're in LOITER this means we should exit gracefully.
-                // This has no effect if we're cruising as it is reset on thermal entry.
-                _exit_commanded = true;
                 break;
             case ActiveStatus::AUTO_MODE_CHANGE:
                 gcs().send_text(MAV_SEVERITY_INFO, "Soaring: Enabled, automatic mode changes.");
-                set_throttle_suppressed(true);
-
-                // We changed mode - if we're in LOITER this means we should exit gracefully.
-                // This has no effect if we're cruising as it is reset on thermal entry.
-                _exit_commanded = true;
                 break;
+        }
+
+        if (_last_update_status == ActiveStatus::SOARING_DISABLED) {
+            // We have switched from disabled into an active mode, start cruising.
+            init_cruising();
+        } else if (status != ActiveStatus::SOARING_DISABLED) {
+            // We switched between active modes. If we're in THERMAL this means we should exit gracefully.
+            // This has no effect if we're cruising as it is reset on thermal entry.
+            _exit_commanded = true;
         }
     }
 

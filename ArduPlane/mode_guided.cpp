@@ -9,8 +9,15 @@ bool ModeGuided::_enter()
       location. This matches the behaviour of the copter code
     */
     plane.guided_WP_loc = plane.current_loc;
-    plane.set_guided_WP();
 
+    if (plane.quadplane.guided_mode_enabled()) {
+        /*
+          if using Q_GUIDED_MODE then project forward by the stopping distance
+        */
+        plane.guided_WP_loc.offset_bearing(degrees(plane.ahrs.groundspeed_vector().angle()),
+                                           plane.quadplane.stopping_distance());
+    }
+    plane.set_guided_WP();
     return true;
 }
 
@@ -30,4 +37,3 @@ void ModeGuided::navigate()
     // Zero indicates to use WP_LOITER_RAD
     plane.update_loiter(0);
 }
-

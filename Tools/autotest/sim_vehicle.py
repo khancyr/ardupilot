@@ -617,12 +617,18 @@ def start_vehicle(binary, opts, stuff, spawns=None):
         path = ",".join(paths)
         progress("Using defaults from (%s)" % (path,))
     if opts.add_param_file:
-        if not os.path.isfile(opts.add_param_file):
-            print("The parameter file (%s) does not exist" %
-                  (opts.add_param_file,))
-            sys.exit(1)
-        path += "," + str(opts.add_param_file)
-        progress("Adding parameters from (%s)" % (str(opts.add_param_file),))
+        for file in opts.add_param_file:
+            if not os.path.isfile(file):
+                print("The parameter file (%s) does not exist" %
+                      (file,))
+                sys.exit(1)
+
+            if path is not None:
+                path += "," + str(file)
+            else:
+                path = str(file)
+
+            progress("Adding parameters from (%s)" % (str(file),))
     if opts.OSDMSP:
         path += "," + os.path.join(root_dir, "libraries/AP_MSP/Tools/osdtest.parm")
         path += "," + os.path.join(autotest_dir, "default_params/msposd.parm")
@@ -804,6 +810,9 @@ parser = CompatOptionParser(
 vehicle_choices = list(vinfo.options.keys())
 # add an alias for people with too much m
 vehicle_choices.append("APMrover2")
+vehicle_choices.append("Copter")  # should change to ArduCopter at some stage
+vehicle_choices.append("Plane")  # should change to ArduPlane at some stage
+vehicle_choices.append("Sub")  # should change to Sub at some stage
 
 parser.add_option("-v", "--vehicle",
                   type='choice',
@@ -1017,6 +1026,7 @@ group_sim.add_option("", "--rgbled",
                      help="Enable SITL RGBLed")
 group_sim.add_option("", "--add-param-file",
                      type='string',
+                     action="append",
                      default=None,
                      help="Add a parameters file to use")
 group_sim.add_option("", "--no-extra-ports",
@@ -1173,6 +1183,9 @@ if cmd_opts.vehicle not in vinfo.options:
 # was the old name / directory name for Rover.
 vehicle_map = {
     "APMrover2": "Rover",
+    "Copter": "ArduCopter",  # will switch eventually
+    "Plane": "ArduPlane",  # will switch eventually
+    "Sub": "ArduSub",  # will switch eventually
 }
 if cmd_opts.vehicle in vehicle_map:
     progress("%s is now known as %s" %

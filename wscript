@@ -82,6 +82,11 @@ def options(opt):
         default=False,
         help='Configure as debug variant.')
 
+    g.add_option('--coverage',
+                 action='store_true',
+                 default=False,
+                 help='Configure coverage flags.')
+
     g.add_option('--Werror',
         action='store_true',
         default=False,
@@ -106,6 +111,11 @@ def options(opt):
         action='store_true',
         default=False,
         help='enable malloc guard regions.')
+
+    g.add_option('--enable-stats',
+        action='store_true',
+        default=False,
+        help='enable OS level thread statistics.')
     
     g.add_option('--bootloader',
         action='store_true',
@@ -279,6 +289,7 @@ def configure(cfg):
         
     cfg.env.BOARD = cfg.options.board
     cfg.env.DEBUG = cfg.options.debug
+    cfg.env.COVERAGE = cfg.options.coverage
     cfg.env.AUTOCONFIG = cfg.options.autoconfig
 
     _set_build_context_variant(cfg.env.BOARD)
@@ -286,9 +297,11 @@ def configure(cfg):
 
     cfg.env.BOARD = cfg.options.board
     cfg.env.DEBUG = cfg.options.debug
+    cfg.env.COVERAGE = cfg.options.coverage
     cfg.env.ENABLE_ASSERTS = cfg.options.enable_asserts
     cfg.env.BOOTLOADER = cfg.options.bootloader
     cfg.env.ENABLE_MALLOC_GUARD = cfg.options.enable_malloc_guard
+    cfg.env.ENABLE_STATS = cfg.options.enable_stats
 
     cfg.env.OPTIONS = cfg.options.__dict__
 
@@ -352,6 +365,18 @@ def configure(cfg):
 
     cfg.start_msg('Scripting runtime checks')
     if cfg.options.scripting_checks:
+        cfg.end_msg('enabled')
+    else:
+        cfg.end_msg('disabled', color='YELLOW')
+
+    cfg.start_msg('Debug build')
+    if cfg.env.DEBUG:
+        cfg.end_msg('enabled')
+    else:
+        cfg.end_msg('disabled', color='YELLOW')
+
+    cfg.start_msg('Coverage build')
+    if cfg.env.COVERAGE:
         cfg.end_msg('enabled')
     else:
         cfg.end_msg('disabled', color='YELLOW')
@@ -636,7 +661,7 @@ ardupilotwaf.build_command('check-all',
     doc='shortcut for `waf check --alltests`',
 )
 
-for name in ('antennatracker', 'copter', 'heli', 'plane', 'rover', 'sub', 'bootloader','iofirmware','AP_Periph','replay'):
+for name in ('antennatracker', 'copter', 'heli', 'plane', 'rover', 'sub', 'blimp', 'bootloader','iofirmware','AP_Periph','replay'):
     ardupilotwaf.build_command(name,
         program_group_list=name,
         doc='builds %s programs' % name,
