@@ -28,6 +28,7 @@
 #include "SIM_Airspeed_DLVR.h"
 #include "SIM_Temperature_TSYS01.h"
 #include "SIM_ICM40609.h"
+#include "SIM_Precland_Irlock.h"
 
 #include <signal.h>
 
@@ -54,6 +55,7 @@ static Rotoye rotoye;
 static Airspeed_DLVR airspeed_dlvr;
 static TSYS01 tsys01;
 static ICM40609 icm40609;
+static Precland_IrlockI2C irlock;
 
 struct i2c_device_at_address {
     uint8_t bus;
@@ -63,6 +65,7 @@ struct i2c_device_at_address {
     { 0, 0x70, maxsonari2cxl },
     { 0, 0x71, maxsonari2cxl_2 },
     { 1, 0x01, icm40609 },
+    { 1, 0x54, irlock },
     { 1, 0x55, toshibaled },
     { 1, 0x38, ignored }, // NCP5623
     { 1, 0x39, ignored }, // NCP5623C
