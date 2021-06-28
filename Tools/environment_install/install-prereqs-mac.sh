@@ -136,7 +136,6 @@ echo "Checking ccache..."
 {
     brew install ccache
     exportline="export PATH=/usr/local/opt/ccache/libexec:\$PATH";
-    echo $exportline >> ~/$SHELL_LOGIN
     eval $exportline
 }
 CCACHE_PATH=$(which ccache)
