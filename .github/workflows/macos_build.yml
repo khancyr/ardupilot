@@ -52,6 +52,9 @@ jobs:
         shell: bash
         run: |
           source ~/.bash_profile
+          if [[ ${{ matrix.config }} == "CubeOrange" ]]; then
+            PATH="/usr/lib/ccache:/opt/gcc-arm-none-eabi-gcc-arm-none-eabi-6-2017-q2-update/bin:$PATH"
+          fi
           PATH="/github/home/.local/bin:$PATH"
           echo $PATH
           ./waf configure --board ${{matrix.config}}
