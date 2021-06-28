@@ -55,9 +55,6 @@ jobs:
         shell: bash
         run: |
           source ~/.bash_profile
-          if [[ ${{ matrix.config }} == "CubeOrange" ]]; then
-            PATH="/usr/local/bin/ccache:$PATH"
-          fi
           PATH="/github/home/.local/bin:$PATH"
           echo $PATH
           ./waf configure --board ${{matrix.config}}
