@@ -23,6 +23,9 @@ jobs:
       - name: Install Prerequisites
         shell: bash
         run: |
+          if [[ ${{ matrix.config }} == "sitl" ]]; then
+            export DO_AP_STM_ENV=0
+          fi
           Tools/environment_install/install-prereqs-mac.sh -y
           source ~/.bash_profile
       # Put ccache into github cache for faster build
@@ -53,7 +56,7 @@ jobs:
         run: |
           source ~/.bash_profile
           if [[ ${{ matrix.config }} == "CubeOrange" ]]; then
-            PATH="/usr/lib/ccache:/opt/gcc-arm-none-eabi-gcc-arm-none-eabi-6-2017-q2-update/bin:$PATH"
+            PATH="/usr/local/bin/ccache:/opt/gcc-arm-none-eabi-gcc-arm-none-eabi-6-2017-q2-update/bin:$PATH"
           fi
           PATH="/github/home/.local/bin:$PATH"
           echo $PATH

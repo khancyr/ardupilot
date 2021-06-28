@@ -129,18 +129,19 @@ if [[ -z "${DO_AP_STM_ENV}" ]] && maybe_prompt_user "Install ArduPilot STM32 too
     DO_AP_STM_ENV=1
 fi
 
+echo "Checking ccache..."
+{
+    $(which -s ccache)
+} ||
+{
+    brew install ccache
+    exportline="export PATH=/usr/local/opt/ccache/libexec:\$PATH";
+    echo $exportline >> ~/$SHELL_LOGIN
+    eval $exportline
+}
+CCACHE_PATH=$(which ccache)
+
 if [[ $DO_AP_STM_ENV -eq 1 ]]; then
-    echo "Checking ccache..."
-    {
-        $(which -s ccache)
-    } ||
-    {
-        brew install ccache
-        exportline="export PATH=/usr/local/opt/ccache/libexec:\$PATH";
-        echo $exportline >> ~/$SHELL_LOGIN
-        eval $exportline
-    }
-    CCACHE_PATH=$(which ccache)
     install_arm_none_eabi_toolchain
 fi
 
