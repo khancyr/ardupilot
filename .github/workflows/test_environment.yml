@@ -1,0 +1,68 @@
+name: test environment setup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 6'  # every saturday at midnight
+
+concurrency:
+  group: ci-${{github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    container:
+      image: ardupilot/ardupilot-dev-coverage:latest
+      options: --privileged
+    strategy:
+      fail-fast: false  # don't cancel if a job from the matrix fails
+      matrix:
+        os: [
+            ubuntu:bionic, # 18.04
+            ubuntu:focal, # 20.04
+            ubuntu:hirsute, # 21.04
+            ubuntu:xenial, # 16.04
+            archlinux,
+            debian:bullseye,
+            debian:buster,
+        ]
+    steps:
+      # git checkout the PR
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: test ${{matrix.os}}
+        env:
+          DISABLE_MAVNATIVE: True
+        shell: 'script -q -e -c "bash {0}"'
+        run: |
+          PATH="/github/home/.local/bin:$PATH"
+          case ${{matrix.os}} in
+            *"ubuntu"*)
+            Tools/environment_install/install-prereqs-ubuntu.sh -y
+            ;;
+            *"debian"*)
+            Tools/environment_install/install-prereqs-ubuntu.sh -y
+            ;;
+            *"archlinux"*)
+            Tools/environment_install/install-prereqs-arch.sh -y
+            ;;
+          esac
+          
+          ./waf configure
+          ./waf rover
+          ./waf configure --board CubeOrange
+          ./waf plane
+
+
+  finish:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Coveralls Finished
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.github_token }}
+          parallel-finished: true
