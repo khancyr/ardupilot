@@ -52,7 +52,7 @@ private:
   template class for more convenient type handling
  */
 template <typename element_type>
-class EKF_obs_buffer_t : ekf_ring_buffer
+class EKF_obs_buffer_t : public ekf_ring_buffer
 {
     static_assert(
         std::is_base_of<EKF_obs_element_t, element_type>::value,
@@ -63,9 +63,9 @@ public:
         ekf_ring_buffer(sizeof(element_type))
         {}
 
-    bool init(uint8_t size) {
+/*    bool init(uint8_t size) {
         return ekf_ring_buffer::init(size);
-    }
+    }*/
 
     bool recall(element_type &element,uint32_t sample_time) {
         return ekf_ring_buffer::recall(&element, sample_time);
@@ -75,9 +75,9 @@ public:
         return ekf_ring_buffer::push(&element);
     }
 
-    void reset() {
+/*    void reset() final {
         return ekf_ring_buffer::reset();
-    }
+    }*/
 };
 
 
@@ -138,16 +138,16 @@ protected:
   template class for more convenient type handling
  */
 template <typename element_type>
-class EKF_IMU_buffer_t : ekf_imu_buffer
+class EKF_IMU_buffer_t : public ekf_imu_buffer
 {
 public:
     EKF_IMU_buffer_t() :
         ekf_imu_buffer(sizeof(element_type))
         {}
 
-    bool init(uint8_t size) {
+/*    bool init(uint32_t size) {
         return ekf_imu_buffer::init(size);
-    }
+    }*/
 
     /*
       Writes data to a Ring buffer and advances indices that
@@ -158,9 +158,9 @@ public:
     }
 
     // return true if the buffer has been filled at least once
-    bool is_filled(void) const {
+/*    bool is_filled(void) const final {
         return ekf_imu_buffer::is_filled();
-    }
+    }*/
     
     // retrieve the oldest data from the ring buffer tail
     element_type get_oldest_element() {
@@ -175,9 +175,9 @@ public:
     }
 
     // zeroes all data in the ring buffer
-    void reset() {
+/*    void reset() {
         ekf_imu_buffer::reset();
-    }
+    }*/
 
     // retrieves data from the ring buffer at a specified index
     element_type& operator[](uint32_t index) {
