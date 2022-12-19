@@ -2876,6 +2876,10 @@ def add_apperiph_defaults(f):
 #define AP_ROBOTISSERVO_ENABLED 0
 #endif
 
+#ifndef AP_HOBBYWING_ESC_TELEM_ENABLED
+#define AP_HOBBYWING_ESC_TELEM_ENABLED defined(HAL_PERIPH_ENABLE_HWESC)
+#endif
+
 #ifndef AP_STATS_ENABLED
 #define AP_STATS_ENABLED 0
 #endif
