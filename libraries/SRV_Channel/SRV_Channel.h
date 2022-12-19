@@ -22,6 +22,7 @@
 #include <AP_SBusOut/AP_SBusOut.h>
 #include <AP_BLHeli/AP_BLHeli.h>
 #include <AP_FETtecOneWire/AP_FETtecOneWire.h>
+#include <AP_HobbyWingESCTelem/AP_HobbyWingESCTelem.h>
 
 #include "SRV_Channel_config.h"
 
@@ -614,6 +615,11 @@ private:
     AP_FETtecOneWire fetteconwire;
     static AP_FETtecOneWire *fetteconwire_ptr;
 #endif  // AP_FETTEC_ONEWIRE_ENABLED
+
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+    AP_HobbyWingESCTelem_ESCTelem_Backend hobbywing_esc_telem;
+    static AP_HobbyWingESCTelem_ESCTelem_Backend *hobbywing_esc_telem_ptr;
+#endif  // AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
 
     // mask of disabled channels
     static uint32_t disabled_mask;

@@ -61,6 +61,10 @@ AP_RobotisServo *SRV_Channels::robotis_ptr;
 AP_FETtecOneWire *SRV_Channels::fetteconwire_ptr;
 #endif
 
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+AP_HobbyWingESCTelem_ESCTelem_Backend *SRV_Channels::hobbywing_esc_telem_ptr;
+#endif
+
 uint16_t SRV_Channels::override_counter[NUM_SERVO_CHANNELS];
 
 #if HAL_SUPPORT_RCOUT_SERIAL
@@ -245,6 +249,12 @@ const AP_Param::GroupInfo SRV_Channels::var_info[] = {
     // @RebootRequired: True
     AP_GROUPINFO("_GPIO_MASK",  26, SRV_Channels, gpio_mask, 0),
 
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+    // @Group: _HW_
+    // @Path: ../AP_HobbyWingESCTelem/AP_HobbyWingESCTelem.cpp
+    AP_SUBGROUPINFO(hobbywing_esc_telem, "_HW_",  44, SRV_Channels, AP_HobbyWingESCTelem_ESCTelem_Backend),
+#endif
+
 #if (NUM_SERVO_CHANNELS >= 17)
     // @Param: _32_ENABLE
     // @DisplayName: Enable outputs 17 to 31
@@ -379,6 +389,10 @@ SRV_Channels::SRV_Channels(void)
     fetteconwire_ptr = &fetteconwire;
 #endif
 
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+    hobbywing_esc_telem_ptr = &hobbywing_esc_telem;
+#endif
+
 #if AP_VOLZ_ENABLED
     volz_ptr = &volz;
 #endif
@@ -405,6 +419,9 @@ void SRV_Channels::init(uint32_t motor_mask, AP_HAL::RCOutput::output_mode mode)
 #endif
 #ifndef HAL_BUILD_AP_PERIPH
     hal.rcout->set_dshot_rate(_singleton->dshot_rate, AP::scheduler().get_loop_rate_hz());
+#endif
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+    hobbywing_esc_telem_ptr->init();
 #endif
 }
 
@@ -532,6 +549,11 @@ void SRV_Channels::push()
 
 #if AP_FETTEC_ONEWIRE_ENABLED
     fetteconwire_ptr->update();
+#endif
+
+#if AP_HOBBYWING_ESC_TELEM_ESC_TELEM_BACKEND_ENABLED
+    // give blheli telemetry a chance to update
+    hobbywing_esc_telem_ptr->update_telemetry();
 #endif
 
 #if HAL_CANMANAGER_ENABLED
