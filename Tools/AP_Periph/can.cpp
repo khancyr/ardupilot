@@ -1614,7 +1614,7 @@ void AP_Periph_FW::hwesc_telem_update()
     if (!hwesc_telem.update()) {
         return;
     }
-    const HWESC_Telem::HWESC &t = hwesc_telem.get_telem();
+    const AP_HobbyWingESCTelem::HWESC &t = hwesc_telem.get_telem();
 
     uavcan_equipment_esc_Status pkt {};
     pkt.esc_index = g.esc_number;
