@@ -36,6 +36,7 @@
 #include "SIM_Battery.h"
 #include <Filter/Filter.h>
 #include "SIM_JSON_Master.h"
+#include "SIM_HWingESC.h"
 
 namespace SITL {
 
@@ -145,6 +146,8 @@ public:
     void set_i2c(class I2C *_i2c) { i2c = _i2c; }
 
     float get_battery_voltage() const { return battery_voltage; }
+
+    HWingESCs hwing_escs;
 
 protected:
     SIM *sitl;
