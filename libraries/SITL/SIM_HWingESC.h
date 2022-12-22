@@ -50,6 +50,12 @@ public:
 private:
 
     // swiped from driver
+
+    // I have significant reservations as to whether "counter" is
+    // actually correctly a 32-bit number; I think this is more likely
+    // to be uint16_t seq and 2 bytes of something else - command or
+    // protocol version or similar.
+
     struct PACKED Packet {
         uint8_t header; // 0x9B
         uint8_t pkt_len; // 0x16
