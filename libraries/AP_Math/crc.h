@@ -36,6 +36,8 @@ uint16_t crc_crc16_ibm(uint16_t crc_accum, uint8_t *data_blk_ptr, uint16_t data_
 // checksum used by SPORT/FPort
 uint8_t crc_sum8(const uint8_t *p, uint8_t len);
 
+uint16_t crc_sum16(const uint8_t *data, uint16_t len);
+
 // Copyright (C) 2010 Swift Navigation Inc.
 // Contact: Fergus Noble <fergus@swift-nav.com>
 uint16_t crc16_ccitt(const uint8_t *buf, uint32_t len, uint16_t crc);

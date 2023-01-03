@@ -13,19 +13,19 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define TELEM_HEADER 0x9B
-#define TELEM_LEN    0x16
 
 // constructor
-AP_HobbyWingESCTelem::AP_HobbyWingESCTelem(void)
+AP_HobbyWingESCTelem::AP_HobbyWingESCTelem()
 {
 }
 
-void AP_HobbyWingESCTelem::init(AP_HAL::UARTDriver *_uart)
+void AP_HobbyWingESCTelem::init(AP_HAL::UARTDriver *_uart, ESC_TELEM_PACKET_TYPE type, uint8_t mot_pole_pairs)
 {
+    pkt_type = type;
     uart = _uart;
     uart->begin(19200);
     uart->set_options(AP_HAL::UARTDriver::OPTION_PULLDOWN_RX);
+    pole_pairs = mot_pole_pairs;
 }
 
 /*
@@ -45,8 +45,8 @@ bool AP_HobbyWingESCTelem::update()
     last_read_ms = now;
 
     // don't read too much in one loop to prevent too high CPU load
-    if (n > 500) {
-        n = 500;
+    if (n > 700) {  // datalink is 640bytes so add some to allow catch a frame per read
+        n = 700;
     }
     if (len == 0 && !frame_gap) {
         uart->discard_input();
@@ -59,32 +59,54 @@ bool AP_HobbyWingESCTelem::update()
 
     bool ret = false;
 
+
     while (n--) {
         uint8_t b = uart->read();
         //hal.console->printf("t=%u 0x%02x\n", now, b);
         if (len == 0 && b != TELEM_HEADER) {
             continue;
         }
-        if (len == 1 && b != TELEM_LEN) {
+        if (len == 0) {
+            len++;
             continue;
         }
-        uint8_t *buf = (uint8_t *)&pkt;
-        buf[len++] = b;
-        if (len == sizeof(pkt)) {
-            ret = parse_packet();
+        if (len == 1 && b != TELEM_LEN_SINGLE ) {
             len = 0;
+            continue;
         }
+        if (len == 1 && b != TELEM_LEN_DATALINK ) {
+            len = 0;
+            continue;
+        }
+
+        if (len == 2 && b != TELEM_SW_VERSION) {
+            len = 0;
+            continue;
+        }
+        if (len == 3 && b != TELEM_CMD_WORD) {
+            len = 0;
+            continue;
+        }
+        if (pkt_type == ESC_TELEM_PACKET_TYPE::SINGLE) {
+            auto buf = (uint8_t *)&pkt_single;
+            buf[len++] = b;
+            if (len == TELEM_LEN_SINGLE) {
+                ret = parse_packet_single();
+                len = 0;
+            }
+        }
+        if (pkt_type == ESC_TELEM_PACKET_TYPE::DATALINK) {
+            auto buf = (uint8_t *)&pkt_datalink;
+            buf[len++] = b;
+            if (len == TELEM_LEN_DATALINK) {
+                ret = parse_packet_datalink();
+                len = 0;
+            }
+        }
+
+
     }
     return ret;
-}
-
-static uint16_t calc_crc(const uint8_t *buf, uint8_t len)
-{
-    uint16_t crc = 0;
-    while (len--) {
-        crc += *buf++;
-    }
-    return crc;
 }
 
 static const struct {
@@ -108,9 +130,9 @@ static const struct {
 
 uint8_t AP_HobbyWingESCTelem::temperature_decode(uint8_t temp_raw) const
 {
-    for (uint8_t i=0; i<ARRAY_SIZE(temp_table); i++) {
-        if (temp_table[i].adc_temp <= temp_raw) {
-            return temp_table[i].temp_C;
+    for (auto i : temp_table) {
+        if (i.adc_temp <= temp_raw) {
+            return i.temp_C;
         }
     }
     return 130U;
@@ -119,26 +141,52 @@ uint8_t AP_HobbyWingESCTelem::temperature_decode(uint8_t temp_raw) const
 /*
   parse packet
  */
-bool AP_HobbyWingESCTelem::parse_packet(void)
+bool AP_HobbyWingESCTelem::parse_packet_single()
 {
-    uint16_t crc = calc_crc((uint8_t *)&pkt, sizeof(pkt)-2);
-    if (crc != pkt.crc) {
+    uint16_t crc = pkt_single.get_crc((uint8_t *)&pkt_single, TELEM_LEN_SINGLE-2);
+    if (crc != pkt_single.crc) {
         return false;
     }
 
-    decoded.counter = be32toh(pkt.counter);
-    decoded.throttle_req = be16toh(pkt.throttle_req);
-    decoded.throttle = be16toh(pkt.throttle);
-    decoded.rpm = be16toh(pkt.rpm) * 5.0 / 7.0; // scale from eRPM to RPM
-    decoded.voltage = be16toh(pkt.voltage) * 0.1;
-    decoded.phase_current = int16_t(be16toh(pkt.phase_current)) * 0.01;
-    decoded.current = int16_t(be16toh(pkt.current)) * 0.01;
-    decoded.mos_temperature = temperature_decode(pkt.mos_temperature);
-    decoded.cap_temperature = temperature_decode(pkt.cap_temperature);
-    decoded.status = be16toh(pkt.status);
-    if (decoded.status != 0) {
-        decoded.error_count++;
+    decoded[0].counter = be16toh(pkt_single.header.seq);
+    decoded[0].throttle_req = be16toh(pkt_single.info.throttle_req);  // * 100.0 / 1024.0 to have pct
+    decoded[0].throttle = be16toh(pkt_single.info.throttle);  // * 100.0 / 1024.0 to have pct
+    decoded[0].rpm = be16toh(pkt_single.info.rpm) * 10.0 / pole_pairs; // * 5.0 / 7.0; // scale from eRPM to RPM // TODO
+    decoded[0].voltage = be16toh(pkt_single.info.voltage) * 0.1;
+    decoded[0].phase_current = int16_t(be16toh(pkt_single.info.phase_current)) * 0.01;
+    decoded[0].current = int16_t(be16toh(pkt_single.info.current)) / 64.0;
+    decoded[0].mos_temperature = temperature_decode(pkt_single.info.mos_temperature);
+    decoded[0].cap_temperature = temperature_decode(pkt_single.info.cap_temperature);
+    decoded[0].status = be16toh(pkt_single.info.status);
+    if (decoded[0].status != 0) {
+        decoded[0].error_count++;
     }
+
+    return true;
+}
+
+bool AP_HobbyWingESCTelem::parse_packet_datalink()
+{
+    uint16_t crc = pkt_single.get_crc((uint8_t *)&pkt_datalink, TELEM_LEN_DATALINK-2);
+    if (crc != pkt_single.crc) {
+        return false;
+    }
+    for (auto & i : pkt_datalink.motor) {
+        decoded[i.esc_channel_number].counter = be16toh(pkt_datalink.header.seq);
+        decoded[i.esc_channel_number].throttle_req = be16toh(i.info.throttle_req);  // * 100.0 / 1024.0 to have pct
+        decoded[i.esc_channel_number].throttle = be16toh(i.info.throttle);  // * 100.0 / 1024.0 to have pct
+        decoded[i.esc_channel_number].rpm = be16toh(i.info.rpm) * 10.0 / pole_pairs; // * 5.0 / 7.0; // scale from eRPM to RPM // TODO
+        decoded[i.esc_channel_number].voltage = be16toh(i.info.voltage) * 0.1;
+        decoded[i.esc_channel_number].phase_current = int16_t(be16toh(i.info.phase_current)) * 0.01;
+        decoded[i.esc_channel_number].current = int16_t(be16toh(i.info.current)) / 64.0;
+        decoded[i.esc_channel_number].mos_temperature = temperature_decode(i.info.mos_temperature);
+        decoded[i.esc_channel_number].cap_temperature = temperature_decode(i.info.cap_temperature);
+        decoded[i.esc_channel_number].status = be16toh(i.info.status);
+        if (decoded[i.esc_channel_number].status != 0) {
+            decoded[i.esc_channel_number].error_count++;
+        }
+    }
+
 
     return true;
 }
@@ -152,6 +200,18 @@ const AP_Param::GroupInfo AP_HobbyWingESCTelem_ESCTelem_Backend::var_info[] = {
     // @User: Advanced
     // @RebootRequired: True
     AP_GROUPINFO("MASK",  1, AP_HobbyWingESCTelem_ESCTelem_Backend, channel_mask, 0),
+    // @Param: TYPE
+    // @DisplayName: HobbyWingESC Telem Type
+    // @Description: Select if Single channel telemetry or Datalink
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("TYPE",  2, AP_HobbyWingESCTelem_ESCTelem_Backend, telem_type, float(ESC_TELEM_PACKET_TYPE::SINGLE)),
+    // @Param: POLE
+    // @DisplayName: MOTOR Pole Pairs
+    // @Description: MOTOR Pole Pairs, used for RPM calculation
+    // @User: Advanced
+    // @RebootRequired: True
+    AP_GROUPINFO("POLPAIR", 3, AP_HobbyWingESCTelem_ESCTelem_Backend, pole_pairs, 14),
 };
 
 // constructor
@@ -162,7 +222,7 @@ AP_HobbyWingESCTelem_ESCTelem_Backend::AP_HobbyWingESCTelem_ESCTelem_Backend(voi
 
 void AP_HobbyWingESCTelem_ESCTelem_Backend::init()
 {
-    for (uint8_t i=0; i<32 && num_backends<ARRAY_SIZE(backends); i++) {
+    for (uint8_t i=0; i<32 && num_backends< MAX_BACKENDS; i++) {
         // work out our servo channel offset.  First instance of this
         // class gets the channel corresponding to the first bit set in
         // the mask etc
@@ -178,7 +238,7 @@ void AP_HobbyWingESCTelem_ESCTelem_Backend::init()
         if (backends[num_backends] == nullptr) {
             break;
         }
-        backends[num_backends]->init(uart);
+        backends[num_backends]->init(uart, telem_type, pole_pairs.get());
         servo_channel[num_backends++] = i+1;
     }
 }
@@ -190,18 +250,37 @@ void AP_HobbyWingESCTelem_ESCTelem_Backend::update_telemetry()
         if (!backend.update()) {
             continue;
         }
-        const auto &decoded = backend.get_telem();
-        update_rpm(servo_channel[i], decoded.rpm, 0);
+        if (telem_type == ESC_TELEM_PACKET_TYPE::SINGLE) {
+            const auto &decoded = backend.get_telem(0);
+            update_rpm(servo_channel[i], decoded.rpm, 0);
 
-        const TelemetryData t {
-            .temperature_cdeg = int16_t(decoded.mos_temperature * 100),
-            .voltage = float(decoded.voltage) * 0.01f,
-            .current = float(decoded.current) * 0.01f,
-        };
-        update_telem_data(servo_channel[i], t,
-                          AP_ESC_Telem_Backend::TelemetryType::CURRENT
-                          | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
-                          | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+            const TelemetryData t {
+                    .temperature_cdeg = int16_t(decoded.mos_temperature * 100),
+                    .voltage = float(decoded.voltage) * 0.01f,
+                    .current = float(decoded.current) * 0.01f,
+            };
+            update_telem_data(servo_channel[i], t,
+                              AP_ESC_Telem_Backend::TelemetryType::CURRENT
+                              | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
+                              | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+        }
+        if (telem_type == ESC_TELEM_PACKET_TYPE::DATALINK) {
+            // TODO how to match datalink link channels and AP Channels ? For now datalink1 is motor 1 - 8, datalink2 motors 9 - 18 etc.
+            for (auto j=0; j<8; j++) {
+                const auto &decoded = backend.get_telem(j);
+                update_rpm((i * 8) + j, decoded.rpm, 0);
+
+                const TelemetryData t {
+                        .temperature_cdeg = int16_t(decoded.mos_temperature * 100),
+                        .voltage = float(decoded.voltage) * 0.01f,
+                        .current = float(decoded.current) * 0.01f,
+                };
+                update_telem_data((i * 8) + j, t,
+                                  AP_ESC_Telem_Backend::TelemetryType::CURRENT
+                                  | AP_ESC_Telem_Backend::TelemetryType::VOLTAGE
+                                  | AP_ESC_Telem_Backend::TelemetryType::TEMPERATURE);
+            }
+        }
     }
 }
 #endif  // AP_HOBBYWING_ESC_TELEM_ESC_TELEM_ENABLED
