@@ -41,6 +41,8 @@ SITL_START_LOCATION = mavutil.location(-35.362938, 149.165085, 584, 270)
 #   switch 6 = Stabilize
 
 
+
+
 class AutoTestCopter(AutoTest):
     @staticmethod
     def get_not_armable_mode_list():
