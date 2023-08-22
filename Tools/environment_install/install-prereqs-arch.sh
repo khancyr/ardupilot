@@ -68,7 +68,7 @@ if [[ $DO_PYTHON_VENV_ENV -eq 1 ]]; then
     echo "$SOURCE_LINE" >> ~/.bashrc
 fi
 
-pip3 -q install -U "$PYTHON_PKGS"
+pip3 -q install -U $PYTHON_PKGS
 
 (
     cd /usr/lib/ccache
