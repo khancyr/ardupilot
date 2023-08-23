@@ -49,7 +49,8 @@ void AP_BattMonitor_Torqeedo::read(void)
         const uint32_t tnow_us = AP_HAL::micros();
         const uint32_t diff_us = tnow_us - _state.last_time_micros;
         if (diff_us < AP_BATTMON_TORQEEDO_TIMEOUT_US) {
-            _state.consumed_mah += _state.current_amps * diff_us / 1000000.0 / 3600.0 * 1000.0;
+            static constexpr float Aus_to_mAh = (1000.0 / 3600.0) * 1e-6;  //  * 1000 -> A to mA, / 3600 -> s to h, 1e-6 -> us to s,
+            _state.consumed_mah += (_state.current_amps * diff_us) * Aus_to_mAh;
         }
         _state.last_time_micros = tnow_us;
         _state.healthy = true;
