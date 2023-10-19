@@ -1,0 +1,52 @@
+name: 'Test Report'
+on:
+  workflow_run:
+    workflows: [
+      'test unit tests and sitl building',
+      'test blimp',
+      'test plane',
+      'test rover',
+      'test sub',
+      'test tracker',
+      'test copter' ]  # runs after CI workflow
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # don't cancel if a job from the matrix fails
+      matrix:
+        config: [
+          sitltest-plane,
+          sitltest-quadplane,
+          sitltest-copter-tests1a,
+          sitltest-copter-tests1b,
+          sitltest-copter-tests1c,
+          sitltest-copter-tests1d,
+          sitltest-copter-tests1e,
+          sitltest-copter-tests2a,
+          sitltest-copter-tests2b,
+          sitltest-heli,
+          sitltest-blimp,
+          sitltest-rover,
+          sitltest-sailboat,
+          sitltest-balancebot,
+          sitltest-sub,
+          sitltest-tracker,
+          base-unit-tests,
+        ]
+
+    steps:
+      - uses: dorny/test-reporter@v1
+        with:
+          artifact: test-results-junit-${{matrix.config}}            # artifact name
+          name: ${{matrix.config}} Tests Report   # Name of the check run which will be created
+          path: '*.xml'                           # Path to test results (inside artifact .zip)
+          reporter: java-junit                    # Format of test results
