@@ -155,3 +155,10 @@ jobs:
            name: fail-${{ matrix.toolchain }}-${{matrix.config}}
            path: /tmp/buildlogs
            retention-days: 14
+
+      - uses: actions/upload-artifact@v3  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:
+          name: test-results-junit-${{ matrix.toolchain }}-${{matrix.config}}
+          path: /__w/ardupilot/ardupilot/autotest_result_*_junit.xml
+          retention-days: 1
