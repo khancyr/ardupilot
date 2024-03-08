@@ -42,7 +42,7 @@ public:
 
     // check for new data
     void update() override {
-        check_uart();
+        build_packet();
     }
 
     // Get model/type name
@@ -71,7 +71,6 @@ private:
     uint8_t nav_validity_flags;
 
     void update_thread();
-    bool check_uart();
     void build_packet();
 
     struct EulerNav_Packet {

@@ -129,50 +129,10 @@ constexpr size_t TimeSyncPaddingSize = EulerNav_AlignTo32Bit(TimeSyncSize);
 constexpr size_t VersionPaddingSize = EulerNav_AlignTo32Bit(VersionSize);
 
 // Return the total size of the message from the message type without padding
-constexpr size_t EulerNavMessageSize(EulerNavMessageType messageType) {
-    switch (messageType) {
-        case EulerNavMessageType::InertialOutput:
-            return InertialOutputSize;
-        case EulerNavMessageType::NavigationOutput:
-            return NavigationOutputSize;
-        case EulerNavMessageType::AccuracyInfo:
-            return AccuracyInfoSize;
-        case EulerNavMessageType::TimeNavigation:
-            return TimeNavigationSize;
-        case EulerNavMessageType::TimeInertial:
-            return TimeInertialSize;
-        case EulerNavMessageType::TimeSync:
-            return TimeSyncSize;
-        case EulerNavMessageType::Version:
-            return VersionSize;
-        default:
-            return 0;
-    }
-}
+// todo make constexpr when c++ > 14
+size_t EulerNavMessageSize(EulerNavMessageType messageType);
 
 // Return the size of the padding for the message type
-constexpr size_t EulerNavMessagePaddingSize(EulerNavMessageType messageType) {
-    switch (messageType) {
-        case EulerNavMessageType::InertialOutput:
-            return InertialOutputPaddingSize;
-        case EulerNavMessageType::NavigationOutput:
-            return NavigationOutputPaddingSize;
-        case EulerNavMessageType::AccuracyInfo:
-            return AccuracyInfoPaddingSize;
-        case EulerNavMessageType::TimeNavigation:
-            return TimeNavigationPaddingSize;
-        case EulerNavMessageType::TimeInertial:
-            return TimeInertialPaddingSize;
-        case EulerNavMessageType::TimeSync:
-            return TimeSyncPaddingSize;
-        case EulerNavMessageType::Version:
-            return VersionPaddingSize;
-        default:
-            return 0;
-    }
-}
-
-
-
+size_t EulerNavMessagePaddingSize(EulerNavMessageType messageType);
 
 #endif // AP_EXTERNAL_AHRS_EULERNAV_ENABLED

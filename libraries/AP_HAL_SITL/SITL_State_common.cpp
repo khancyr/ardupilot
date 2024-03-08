@@ -288,6 +288,12 @@ SITL::SerialDevice *SITL_State_Common::create_serial_sim(const char *name, const
         }
         inertiallabs = new SITL::InertialLabs();
         return inertiallabs;
+    } else if (streq(name, "EulerNav")) {
+        if (eulernav != nullptr) {
+            AP_HAL::panic("Only one EulerNav at a time");
+        }
+        eulernav = new SITL::EulerNav();
+        return eulernav;
 
 #if HAL_SIM_AIS_ENABLED
     } else if (streq(name, "AIS")) {

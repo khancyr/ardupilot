@@ -35,6 +35,7 @@
 #include <SITL/SIM_RF_GYUS42v2.h>
 #include <SITL/SIM_VectorNav.h>
 #include <SITL/SIM_MicroStrain.h>
+#include <SITL/SIM_EulerNav.h>
 #include <SITL/SIM_InertialLabs.h>
 #include <SITL/SIM_AIS.h>
 #include <SITL/SIM_GPS.h>
@@ -203,6 +204,9 @@ public:
 
     // simulated InertialLabs INS
     SITL::InertialLabs *inertiallabs;
+
+    // simulated EulerNav system
+    SITL::EulerNav *eulernav;
     
 #if HAL_SIM_JSON_MASTER_ENABLED
     // Ride along instances via JSON SITL backend

@@ -52,8 +52,8 @@ void EulerNav::send_EulerNav_inertial_output() {
     uint8_t padding[padding_size]{0};
 
     uint32_t crc = EULERNAV_INIT_CRC;
-    crc = crc32_mpeg2((const uint32_t *)&data, len, crc);
-    crc = crc32_mpeg2((const uint32_t *)&padding, padding_size, crc);
+    crc = crc32_small(crc, (const uint8_t *)&data, len);
+    crc = crc32_small(crc, (const uint8_t *)&padding, padding_size);
 
     write_to_autopilot((char *)&data, len);
     write_to_autopilot((char *)&padding, padding_size);
@@ -71,9 +71,9 @@ void EulerNav::update(void)
 // 10Hz : TimeOfInertialData
 // 10ms : navigation data
 // 10Hz: Accuracy data, TimeOfNavigationData
-
-    uint32_t now = AP_HAL::micros();
-    if (now - last_pkt1_us >= 20000) {
+    const uint32_t ms_between_imu_packets = 5;
+    uint32_t now = AP_HAL::millis();
+    if (now - last_pkt1_us >= ms_between_imu_packets) {
         last_pkt1_us = now;
         send_EulerNav_inertial_output();
     }

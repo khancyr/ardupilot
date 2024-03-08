@@ -329,6 +329,7 @@ uint32_t crc32_small(uint32_t crc, const uint8_t *buf, uint32_t size)
     return crc;
 }
 
+
 uint32_t crc32_mpeg2(const uint32_t* data, uint32_t size, uint32_t crc)
 {
     for (uint32_t uPos = 0; uPos < size; ++uPos)

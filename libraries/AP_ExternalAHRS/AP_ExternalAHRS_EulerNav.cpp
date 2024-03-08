@@ -1,3 +1,31 @@
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/*
+  Support for EulerNav serially connected AHRS Systems
+  Usage in SITL with hardware for debugging:
+    $ sim_vehicle.py -v Rover -A "--serial3=uart:/dev/EulerNav" --console --map -DG
+    $ ./Tools/autotest/sim_vehicle.py -v Rover -A "--serial3=uart:/dev/EulerNav" -DG
+    param set AHRS_EKF_TYPE 11
+    param set EAHRS_TYPE 11
+    param set SERIAL3_BAUD 115
+    param set SERIAL3_PROTOCOL 36
+  UDEV rules for repeatable USB connection:
+    $ cat /etc/udev/rules.d/99-usb-serial.rules
+    SUBSYSTEM=="tty", ATTRS{manufacturer}=="Lord Microstrain", SYMLINK+="EulerNav"
+  Usage with simulated MicroStrain7:
+    ./Tools/autotest/sim_vehicle.py -v Rover -A "--serial3=sim:EulerNav" --console --map -DG
+ */
+
 #include "AP_ExternalAHRS_config.h"
 
 #if AP_EXTERNAL_AHRS_EULERNAV_ENABLED
@@ -26,8 +54,6 @@ AP_ExternalAHRS_EulerNav::AP_ExternalAHRS_EulerNav(AP_ExternalAHRS *_frontend,
     port_num = sm.find_portnum(AP_SerialManager::SerialProtocol_AHRS, 0);
 
     // don't offer IMU by default, at 200Hz it is too slow for many aircraft
-    set_default_sensors(uint16_t(AP_ExternalAHRS::AvailableSensor::BARO) |
-                        uint16_t(AP_ExternalAHRS::AvailableSensor::COMPASS));
 
     if (!hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_ExternalAHRS_EulerNav::update_thread, void), "EulerNav", 2048, AP_HAL::Scheduler::PRIORITY_SPI, 0)) {
         AP_HAL::panic("EulerNav Failed to start ExternalAHRS update thread");
@@ -90,13 +116,20 @@ void AP_ExternalAHRS_EulerNav::handle_byte(const uint8_t b, EulerNavMessageType&
             }
             break;
 
-        case ParseState::WaitingFor_MessageType:
-            message_in.packet.messageType = static_cast<EulerNavMessageType>(b);
-            message_in.state = ParseState::WaitingFor_Data;
+        case ParseState::WaitingFor_MessageType: {
+            const auto msgType = static_cast<EulerNavMessageType>(b);
             message_in.data_length = EulerNavMessageSize(message_in.packet.messageType);
+            if (message_in.data_length == 0) {
+                message_in.state = ParseState::WaitingFor_SyncOne;
+                message_in.index = 0;
+                return;
+            }
+            message_in.packet.messageType = msgType;
+            message_in.state = ParseState::WaitingFor_Data;
             message_in.padding_length = EulerNavMessagePaddingSize(message_in.packet.messageType);
             message_in.index = 0;
             break;
+        }
         case ParseState::WaitingFor_Data:
             message_in.packet.payload[message_in.index++] = b;
             if (message_in.index >= message_in.data_length) {
@@ -128,7 +161,7 @@ void AP_ExternalAHRS_EulerNav::handle_byte(const uint8_t b, EulerNavMessageType&
 
 bool AP_ExternalAHRS_EulerNav::valid_packet(const EulerNav_Packet & packet, const uint8_t full_length)
 {
-    const uint32_t crc = crc32_mpeg2((const uint32_t *)&packet, full_length, EULERNAV_INIT_CRC);
+    const uint32_t crc = crc32_small(EULERNAV_INIT_CRC, (const uint8_t *)&packet, full_length);
     return crc == be32toh_ptr(packet.checksum);
 }
 
@@ -177,7 +210,6 @@ void AP_ExternalAHRS_EulerNav::handle_imu(const EulerNav_Packet& packet)
         WITH_SEMAPHORE(state.sem);
         state.accel = accel;
         state.gyro = gyro;
-        state.have_quaternion = false;
     }
 
     {
@@ -197,9 +229,14 @@ void AP_ExternalAHRS_EulerNav::handle_nav(const EulerNav_Packet& packet)
     last_nav_pkt = AP_HAL::millis();
 //    const auto pressure = be16toh_ptr(packet.payload + 1);
 //    const auto velocity_z = be16toh_ptr(packet.payload + 3);
-//    const auto roll_angle = be16toh_ptr(packet.payload + 5);
-//    const auto pitch_angle = be16toh_ptr(packet.payload + 7);
-//    const auto heading_angle = be16toh_ptr(packet.payload + 9);
+    const auto roll_angle = be16toh_ptr(packet.payload + 5);
+    const auto pitch_angle = be16toh_ptr(packet.payload + 7);
+    const auto heading_angle = be16toh_ptr(packet.payload + 9);
+    {
+        WITH_SEMAPHORE(state.sem);
+        state.quat.from_euler(roll_angle, pitch_angle, heading_angle);
+        state.have_quaternion = true;
+    }
     nav_validity_flags = packet.payload[11];
 
 }
