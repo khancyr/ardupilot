@@ -494,9 +494,7 @@ bool AP_ExternalAHRS_InertialLabs::check_uart()
         GOT_MSG(ORIENTATION_ANGLES) &&
         GOT_MSG(VELOCITIES)) {
 
-        float roll, pitch, yaw;
-        state.quat.to_euler(roll, pitch, yaw);
-        uint64_t now_us = AP_HAL::micros64();
+        const uint64_t now_us = AP_HAL::micros64();
 
         // @LoggerMessage: ILB1
         // @Description: InertialLabs AHRS data1
