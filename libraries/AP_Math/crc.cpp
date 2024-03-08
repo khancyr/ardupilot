@@ -329,6 +329,28 @@ uint32_t crc32_small(uint32_t crc, const uint8_t *buf, uint32_t size)
     return crc;
 }
 
+uint32_t crc32_mpeg2(const uint32_t* data, uint32_t size, uint32_t crc)
+{
+    for (uint32_t uPos = 0; uPos < size; ++uPos)
+    {
+        crc = crc ^ data[uPos];
+
+        for (uint8_t uIndex = 0; uIndex < 32; uIndex++)
+        {
+            if (crc & 0x80000000)
+            {
+                crc = (crc << 1) ^ 0x04C11DB7;
+            }
+            else
+            {
+                crc = (crc << 1);
+            }
+        }
+    }
+
+    return crc;
+}
+
 /*
  * Copyright (C) 2010 Swift Navigation Inc.
  * Contact: Fergus Noble <fergus@swift-nav.com>
