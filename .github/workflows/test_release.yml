@@ -1,0 +1,83 @@
+# This workflow will build FCS binary
+
+name: Build FCS binary
+
+on:
+  pull_request:
+    branches:
+      - "main"
+  release:
+    types: [published]
+
+  workflow_dispatch:
+
+jobs:
+  get-ref-name:
+    runs-on: ubuntu-latest
+    outputs:
+      ref_name: ${{ steps.get-ref-name.outputs.ref_name }}
+    steps:
+      - name: Get ref_name
+        id: get-ref-name
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            sanitized_ref=$(echo ${{ github.head_ref }} | sed 's/[^a-zA-Z0-9.]/-/g')
+          else
+            sanitized_ref=$(echo ${{ github.ref_name }} | sed 's/[^a-zA-Z0-9.]/-/g')
+          fi
+          echo "ref_name=$sanitized_ref"
+          echo "ref_name=$sanitized_ref" >> $GITHUB_OUTPUT || exit 1
+  build:
+    needs: get-ref-name
+    name: Build fcs
+    runs-on: ubuntu-latest
+    container: ardupilot/ardupilot-dev-chibios:v0.1.3
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      # Put ccache into github cache for faster build
+      - name: Prepare ccache timestamp
+        id: ccache_cache_timestamp
+        run: |
+          NOW=$(date -u +"%F-%T")
+          echo "timestamp=${NOW}" >> $GITHUB_OUTPUT
+      - name: ccache cache files
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{github.workflow}}-ccache--${{steps.ccache_cache_timestamp.outputs.timestamp}}
+          restore-keys: ${{github.workflow}}-ccache-  # restore ccache from either previous build on this branch or on master
+      - name: setup ccache
+        run: |
+          mkdir -p ~/.ccache
+          echo "base_dir = ${GITHUB_WORKSPACE}" > ~/.ccache/ccache.conf
+          echo "compression = true" >> ~/.ccache/ccache.conf
+          echo "compression_level = 6" >> ~/.ccache/ccache.conf
+          echo "max_size = 400M" >> ~/.ccache/ccache.conf
+          ccache -s
+          ccache -z
+      - name: build
+        env:
+          CI_BUILD_TARGET: CubeOrange
+        shell: bash
+        run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
+          PATH="/usr/lib/ccache:/opt/gcc-arm-none-eabi-10/bin:$PATH"
+          PATH="/github/home/.local/bin:$PATH"
+          Tools/scripts/build_ci.sh
+          ccache -s
+          ccache -z
+      - name: Archive release
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcs_release_${{ needs.get-ref-name.outputs.ref_name }}
+          path: /__w/ardupilot/ardupilot/build/CubeOrange/bin/arducopter.apj
+      - name: "Publish to GitHub"
+        uses: softprops/action-gh-release@v2
+        with:
+          files: /__w/ardupilot/ardupilot/build/CubeOrange/bin/arducopter.apj
+
