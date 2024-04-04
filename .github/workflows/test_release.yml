@@ -62,7 +62,7 @@ jobs:
           ccache -z
       - name: build
         env:
-          CI_BUILD_TARGET: CubeOrange
+          CI_BUILD_TARGET: release
         shell: bash
         run: |
           git config --global --add safe.directory ${GITHUB_WORKSPACE}
