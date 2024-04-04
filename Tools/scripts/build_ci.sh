@@ -492,6 +492,7 @@ for t in $CI_BUILD_TARGET; do
                 --check-c-compiler="$c_compiler" \
                 --check-cxx-compiler="$cxx_compiler"
         $waf clean
+        $waf copter
         ccache -s && ccache -z
         continue
     fi
