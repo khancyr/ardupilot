@@ -1,0 +1,52 @@
+# hw definition file for processing by chibios_hwdef.py
+
+# MCU class and specific type
+SITL STM32F4xx STM32F427xx
+
+# We set a specific HAL_BOARD_SUBTYPE, allowing for custom config in
+# drivers. For this to be used the subtype needs to be added to
+# AP_HAL/AP_HAL_Boards.h as well.
+define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_SITL_XXXX
+
+
+# Serial port for stdout. This is optional. If you leave it out then
+# output from printf() lines will go to the ArduPilot console, which is the
+# first UART in the SERIAL_ORDER list.  But note that some startup code
+# runs before USB is set up.
+# The value for STDOUT_SERIAL is a serial device name, and must be for a
+# serial device for which pins are defined in this file. For example, SD7
+# is for UART7 (SD7 == "serial device 7" in ChibiOS).
+# TODO : serial mapping
+#STDOUT_SERIAL SD7
+#STDOUT_BAUDRATE 57600
+
+
+# Now the serial ordering. These map to the SERIALn_ parameter numbers
+# If you use a shorter list then HAL_Empty::UARTDriver
+# objects are substituted for later UARTs, or you can leave a gap by
+# listing one or more of the uarts as EMPTY.
+
+# The normal usage of this ordering is:
+# 1) SERIAL0: console (primary mavlink, usually USB)
+# 2) SERIAL1: telem1
+# 3) SERIAL2: telem2
+# 4) SERIAL3: primary GPS
+# 5) SERIAL4: GPS2
+# 6) SERIAL5: extra UART (usually RTOS debug console)
+
+# order of UARTs (and USB)
+# TODO : serial mapping
+SERIAL_ORDER USART1 USART2 USART3 UART4 UART8 UART7
+
+
+# We need to tell HAL_ChibiOS/Storage.cpp how much storage is
+# available (in bytes).
+define HAL_STORAGE_SIZE 32768
+
+# allow to have have a dedicated safety switch pin
+define HAL_HAVE_SAFETY_SWITCH 1
+
+# Setup for the possibility of an IMU heater since the pixhawk2 cube has
+# an IMU heater.
+define HAL_HAVE_IMU_HEATER 1
+
