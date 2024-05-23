@@ -1,17 +1,17 @@
--- This script is a test of param set and get
+-- This script is a allow to switch the standby function by the switch of the remote controller on 2 simulated fcus.
 
-local count = 0
+-- variable to limit the number of messages sent to GCS
 local last_value = 0
-local last_rc8_input = 0
+local last_rc_input = 0
 
+-- constants
 local switch_high = 2
 local switch_low = 0
 local standby_function = 76
+local rc_input_pin = 8
 
-local scripting_rc_1 = rc:find_channel_for_option(300)
 
-
--- for fast param acess it is better to get a param object,
+-- for fast param access it is better to get a param object,
 -- this saves the code searching for the param by name every time
 local JSON_MASTER = Parameter()
 if not JSON_MASTER:init('SIM_JSON_MASTER') then
@@ -23,37 +23,22 @@ if not SYSID_THISMAV:init('SYSID_THISMAV') then
   gcs:send_text(6, 'get SYSID_THISMAV failed')
 end
 
-
 local sysid = SYSID_THISMAV:get()
 
--- this allows this example to catch the otherwise fatal error
--- not recommend if error is possible/expected, use separate construction and init
+gcs:send_text(6, 'LUA: Standby LUA loaded')
 
--- local user_param = Parameter('SCR_USER1')
--- is equivalent to:
--- local user_param = Parameter()
--- assert(user_param:init('SCR_USER1'), 'No parameter: SCR_USER1')
-gcs:send_text(6, 'LUA: hello')
+-- The loop check the value of the switch of the remote controller and switch the standby function of the simulated fcus.
+-- The switch is on the channel 8 of the remote controller.
+-- fcu1 and fcu2 have mirrored standby function, so only one is active at a time.
+-- As this is for simulation, the SIM_JSON_MASTER param is also update to select which fcu control the motors.
 
 function update() -- this is the loop which periodically runs
+  rc_input = rc:get_pwm(rc_input_pin)
 
-  -- get and print all the scripting parameters
-  local value = JSON_MASTER:get()
-  if value then
-      if value ~= last_value then
-          gcs:send_text(6, string.format('LUA: SIM_JSON_MASTER: %i',value))
-          last_value = value
-      end
-  else
-    gcs:send_text(6, 'LUA: get SIM_JSON_MASTER failed')
-  end
 
-  rc8_input = rc:get_pwm(8)
-  -- standby switch enable == high
-
-  if rc8_input ~= last_rc8_input then
+  if rc_input ~= last_rc_input then
       if sysid == 2 then
-          if rc8_input > 1500 then
+          if rc_input > 1500 then
               if not JSON_MASTER:set(0) then
                   gcs:send_text(6, string.format('LUA: failed to set JSON_MASTER'))
               else
@@ -70,7 +55,7 @@ function update() -- this is the loop which periodically runs
           end
       end
       if sysid == 1 then
-          if rc8_input > 1500 then
+          if rc_input > 1500 then
               if not JSON_MASTER:set(0) then
                   gcs:send_text(6, string.format('LUA: failed to set JSON_MASTER'))
               else
@@ -86,7 +71,7 @@ function update() -- this is the loop which periodically runs
               end
           end
       end
-      last_rc8_input = rc8_input
+      last_rc_input = rc_input
   end
 
   return update, 1000 -- reschedules the loop
