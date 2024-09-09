@@ -2,7 +2,7 @@
 # useful script to test all the different build types that we support.
 # This helps when doing large merges
 # Andrew Tridgell, November 2011
-
+echo "::group::Build_ci.sh Setup"
 XOLDPWD=$PWD  # profile changes directory :-(
 
 . ~/.profile

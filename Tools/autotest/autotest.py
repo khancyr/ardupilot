@@ -719,7 +719,10 @@ def run_tests(steps):
     passed = True
     failed = []
     failed_testinstances = dict()
+    should_close_group = False
     for step in steps:
+        if "build" in step:
+            should_close_group = True
         util.pexpect_close_all()
 
         t1 = time.time()
@@ -733,6 +736,9 @@ def run_tests(steps):
                 results.add(step, '<span class="passed-text">PASSED</span>',
                             time.time() - t1)
                 print(">>>> PASSED STEP: %s at %s" % (step, time.asctime()))
+                if should_close_group:
+                    print("::endgroup::")
+                    should_close_group = False
             else:
                 print(">>>> FAILED STEP: %s at %s" % (step, time.asctime()))
                 passed = False
@@ -763,6 +769,7 @@ def run_tests(steps):
             tester.rc_thread = None
 
     if not passed:
+        print("::group::Failure Summary")
         keys = failed_testinstances.keys()
         if len(keys):
             print("Failure Summary:")
@@ -773,6 +780,7 @@ def run_tests(steps):
                     print("  " + str(failure))
 
         print("FAILED %u tests: %s" % (len(failed), failed))
+        print("::endgroup::")
 
     util.pexpect_close_all()
 

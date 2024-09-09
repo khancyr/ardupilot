@@ -92,7 +92,7 @@ class AutoTestRover(vehicle_test_suite.TestSuite):
             "RC9_OPTION": 58,
         })
 
-        self.change_mode('MANUAL')
+        self.change_mode('RTL')
 
         self.wait_ready_to_arm()
         self.arm_vehicle()
