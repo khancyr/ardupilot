@@ -748,6 +748,7 @@ def run_tests(steps):
             failed.append(step)
             print(">>>> FAILED STEP: %s at %s (%s)" %
                   (step, time.asctime(), msg))
+            print(f"::error file=autotest.py::{msg}")
             traceback.print_exc(file=sys.stdout)
             results.add(step,
                         '<span class="failed-text">FAILED</span>',

@@ -76,7 +76,7 @@ const AP_Param::GroupInfo AP_Parachute::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("CRT_SINK", 6, AP_Parachute, _critical_sink, AP_PARACHUTE_CRITICAL_SINK_DEFAULT),
 
-    // @Param: OPTIONS
+    // @Param: OPTIO
     // @DisplayName: Parachute options
     // @Description: Optional behaviour for parachute
     // @Bitmask: 0:hold open forever after release,1:skip disarm before parachute release
