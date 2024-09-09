@@ -459,6 +459,7 @@ def run_step(step):
         return util.build_replay(board='SITL')
 
     if vehicle_binary is not None:
+        print(f"::group::{step}")
         try:
             binary = binary_path(step, debug=opts.debug)
             os.unlink(binary)
@@ -719,16 +720,17 @@ def run_tests(steps):
     passed = True
     failed = []
     failed_testinstances = dict()
-    should_close_group = False
+    print("::endgroup::")
+
     for step in steps:
-        if "build" in step:
-            should_close_group = True
         util.pexpect_close_all()
 
         t1 = time.time()
         print(">>>> RUNNING STEP: %s at %s" % (step, time.asctime()))
         try:
             success = run_step(step)
+            if "build" in step:
+                print("::endgroup::")
             testinstance = None
             if isinstance(success, tuple):
                 (success, testinstance) = success
@@ -736,9 +738,6 @@ def run_tests(steps):
                 results.add(step, '<span class="passed-text">PASSED</span>',
                             time.time() - t1)
                 print(">>>> PASSED STEP: %s at %s" % (step, time.asctime()))
-                if should_close_group:
-                    print("::endgroup::")
-                    should_close_group = False
             else:
                 print(">>>> FAILED STEP: %s at %s" % (step, time.asctime()))
                 passed = False
@@ -752,9 +751,9 @@ def run_tests(steps):
         except Exception as msg:
             passed = False
             failed.append(step)
+            print("::endgroup::")
             print(">>>> FAILED STEP: %s at %s (%s)" %
                   (step, time.asctime(), msg))
-            print(f"::error file=autotest.py::{msg}")
             traceback.print_exc(file=sys.stdout)
             results.add(step,
                         '<span class="failed-text">FAILED</span>',

@@ -9052,6 +9052,7 @@ Also, ignores heartbeats not from our target system'''
         else:
             self.progress('FAILED: "%s": %s (see %s)' %
                           (prettyname, repr(ex), test_output_filename))
+            print(f"::error::FAILED: {prettyname}: {repr(ex)} (see {test_output_filename})", file=sys.stdout)
             result.exception = ex
             result.debug_filename = test_output_filename
             if interact:
@@ -12301,7 +12302,9 @@ switch value'''
 
             for test in tests:
                 self.drain_mav_unparsed()
+                print(f"::group::{test.name}")
                 result_list.append(self.run_one_test(test))
+                print("::endgroup::")
 
         except pexpect.TIMEOUT:
             self.progress("Failed with timeout")
@@ -12312,6 +12315,7 @@ switch value'''
             if self.logs_dir:
                 if glob.glob("core*") or glob.glob("ap-*.core"):
                     self.check_logs("FRAMEWORK")
+            print("::endgroup::")
 
         if self.rc_thread is not None:
             self.progress("Joining RC thread")
