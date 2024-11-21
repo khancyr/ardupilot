@@ -41,6 +41,9 @@
 #include "AP_GPS_MAV.h"
 #include "AP_GPS_MSP.h"
 #include "AP_GPS_ExternalAHRS.h"
+#if AP_GPS_GPSD_ENABLED
+#include "AP_GPS_GPSD.h"
+#endif
 #include "GPS_Backend.h"
 #if HAL_SIM_GPS_ENABLED
 #include "AP_GPS_SITL.h"
@@ -564,6 +567,9 @@ void AP_GPS::send_blob_start(uint8_t instance)
 #if HAL_SIM_GPS_ENABLED
     case GPS_TYPE_SITL:
 #endif  // HAL_SIM_GPS_ENABLED
+#if AP_GPS_GPSD_ENABLED
+    case GPS_TYPE_GPSD:
+#endif //AP_GPS_GPSD_ENABLED
         // none of these GPSs have initialisation blobs
         break;
     default:
@@ -673,6 +679,11 @@ AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
         dstate->auto_detected_baud = false; // specified, not detected
         return NEW_NOTHROW AP_GPS_GSOF(*this, params[instance], state[instance], _port[instance]);
 #endif //AP_GPS_GSOF_ENABLED
+#if AP_GPS_GPSD_ENABLED
+    case GPS_TYPE_GPSD:
+        dstate->auto_detected_baud = false; // specified, not detected
+        return NEW_NOTHROW AP_GPS_GPSD(*this, params[instance], state[instance], _port[instance]);
+#endif //AP_GPS_GPSD_ENABLED
     default:
         break;
     }
@@ -895,6 +906,7 @@ void AP_GPS::update_instance(uint8_t instance)
             // do not try to detect again if type is MAV or UAVCAN
             if (type == GPS_TYPE_MAV ||
                 type == GPS_TYPE_UAVCAN ||
+                type == GPS_TYPE_GPSD ||
                 type == GPS_TYPE_UAVCAN_RTK_BASE ||
                 type == GPS_TYPE_UAVCAN_RTK_ROVER) {
                 state[instance].status = NO_FIX;
