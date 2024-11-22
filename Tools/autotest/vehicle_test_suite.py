@@ -8793,9 +8793,12 @@ Also, ignores heartbeats not from our target system'''
             self.progress("Run attempt failed.  Retrying")
         return self.run_one_test_attempt(test, interact=interact, attempt=1, suppress_stdout=suppress_stdout)
 
-    def print_exception_caught(self, e, send_statustext=True):
-        self.progress("Exception caught: %s" %
-                      self.get_exception_stacktrace(e))
+    def print_exception_caught(self, e, send_statustext=True, attempt=1):
+        attempt_str = ""
+        if attempt > 1:
+            attempt_str = f"Attempt {attempt}"
+
+        self.progress("%s Exception caught: %s" % (attempt_str, self.get_exception_stacktrace(e)))
         path = None
         try:
             path = self.current_onboard_log_filepath()
@@ -8878,7 +8881,7 @@ Also, ignores heartbeats not from our target system'''
 
             test_function(**test_kwargs)
         except Exception as e:
-            self.print_exception_caught(e)
+            self.print_exception_caught(e, attempt=attempt)
             ex = e
             # reset the message hooks; we've failed-via-exception and
             # can't expect the hooks to have been cleaned up
