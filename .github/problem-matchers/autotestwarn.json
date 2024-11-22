@@ -6,7 +6,7 @@
             "severity": "warning",
             "pattern": [
                 {
-                    "regexp": "^(.*)(WARN|WARNING):(.*)$",
+                    "regexp": "^(?!.*ExcludedError)(.*)(WARN|WARNING):(.*)$",
                     "column": 1,
                     "code": 2,
                     "message": 3
