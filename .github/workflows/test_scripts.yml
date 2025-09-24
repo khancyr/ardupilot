@@ -21,8 +21,11 @@ jobs:
             validate_board_list,
             logger_metadata,
             param-file-validation,
-       ]
+        ]
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        with:
+          config: ${{ vars.PERMISSIONS_CONFIG }}
       # git checkout the PR
       - uses: actions/checkout@v5
         with:

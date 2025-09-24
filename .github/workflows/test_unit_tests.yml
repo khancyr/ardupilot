@@ -117,6 +117,9 @@ jobs:
             sitl
         ]
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        with:
+          config: ${{ vars.PERMISSIONS_CONFIG }}
       # git checkout the PR
       - uses: actions/checkout@v5
         with:
