@@ -43,6 +43,9 @@ jobs:
           - os: debian
             name: bullseye
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        with:
+          config: ${{ vars.PERMISSIONS_CONFIG }}
       - name: Install Git
         timeout-minutes: 30
         env:
