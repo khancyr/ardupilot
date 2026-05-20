@@ -33,14 +33,19 @@ jobs:
             if (prs && prs.length > 0) {
               prNumber = prs[0].number;
             } else {
-              const headSha = context.payload.workflow_run.head_sha;
-              const result = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              // For fork PRs, commits don't exist in the base repo history so
+              // listPullRequestsAssociatedWithCommit returns empty. Use the
+              // head owner + branch from the workflow_run payload instead.
+              const headOwner = context.payload.workflow_run.head_repository.owner.login;
+              const headBranch = context.payload.workflow_run.head_branch;
+              const result = await github.rest.pulls.list({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                commit_sha: headSha,
+                head: `${headOwner}:${headBranch}`,
+                state: 'open',
               });
               if (result.data.length === 0) {
-                core.warning('No PR found for commit ' + headSha);
+                core.warning(`No open PR found for ${headOwner}:${headBranch}`);
                 return;
               }
               prNumber = result.data[0].number;
