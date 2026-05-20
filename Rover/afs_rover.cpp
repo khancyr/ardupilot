@@ -21,6 +21,7 @@ void AP_AdvancedFailsafe_Rover::terminate_vehicle(void)
 /*
   Return an AFS_MODE for current control mode
  */
+
 AP_AdvancedFailsafe::control_mode AP_AdvancedFailsafe_Rover::afs_mode(void)
 {
     if (rover.control_mode->is_autopilot_mode()) {
