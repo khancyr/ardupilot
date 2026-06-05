@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-22.04
     container: ardupilot/ardupilot-dev-${{ matrix.toolchain }}:v0.1.3
     strategy:
-      fail-fast: false  # don't cancel if a job from the matrix fails
+      fail-fast: true  # don't cancel if a job from the matrix fails
       matrix:
         toolchain: [
             base,  # GCC
