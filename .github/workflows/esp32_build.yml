@@ -48,17 +48,17 @@ on:
       # Remove markdown files as irrelevant
       - '**.md'
       # Remove dotfile at root directory
-      - './.dir-locals.el'
-      - './.dockerignore'
-      - './.editorconfig'
-      - './.flake8'
-      - './.gitattributes'
-      - './.github'
-      - './.gitignore'
-      - './.pre-commit-config.yaml'
-      - './.pydevproject'
-      - './.valgrind-suppressions'
-      - './.valgrindrc'
+      - '.dir-locals.el'
+      - '.dockerignore'
+      - '.editorconfig'
+      - '.flake8'
+      - '.gitattributes'
+      - '.github'
+      - '.gitignore'
+      - '.pre-commit-config.yaml'
+      - '.pydevproject'
+      - '.valgrind-suppressions'
+      - '.valgrindrc'
       - 'Dockerfile'
       - 'Vagrantfile'
       - 'Makefile'
@@ -117,17 +117,17 @@ on:
       # Remove markdown files as irrelevant
       - '**.md'
       # Remove dotfile at root directory
-      - './.dir-locals.el'
-      - './.dockerignore'
-      - './.editorconfig'
-      - './.flake8'
-      - './.gitattributes'
-      - './.github'
-      - './.gitignore'
-      - './.pre-commit-config.yaml'
-      - './.pydevproject'
-      - './.valgrind-suppressions'
-      - './.valgrindrc'
+      - '.dir-locals.el'
+      - '.dockerignore'
+      - '.editorconfig'
+      - '.flake8'
+      - '.gitattributes'
+      - '.github'
+      - '.gitignore'
+      - '.pre-commit-config.yaml'
+      - '.pydevproject'
+      - '.valgrind-suppressions'
+      - '.valgrindrc'
       - 'Dockerfile'
       - 'Vagrantfile'
       - 'Makefile'
@@ -204,16 +204,16 @@ jobs:
           python3 -m pip install --progress-bar off lxml pymavlink MAVProxy pexpect flake8 geocoder empy==3.3.4 dronecan "pydantic<2.12"
           which cmake
           ./waf configure --board ${{matrix.config}} 
-          echo './waf configure --board ${{matrix.config}}' >> $GITHUB_STEP_SUMMARY  
+          echo 'waf configure --board ${{matrix.config}}' >> $GITHUB_STEP_SUMMARY  
           echo "### Build Plane ${{matrix.config}} :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo './waf plane' >> $GITHUB_STEP_SUMMARY  
+          echo 'waf plane' >> $GITHUB_STEP_SUMMARY  
           ./waf plane | tee >( grep -vE 'Compiling|Generat|includes.list|Parsing|Validation|Building|Linking|Detecting|linker|\*\*\*\*\*\*\*|Partition|SubType|Checking|esp-idf' --color=never --line-buffered > summary.log)  
           cat summary.log >> $GITHUB_STEP_SUMMARY 
 
           cp build/${{matrix.config}}/esp-idf_build/ardupilot.bin ./ArduPlane.${{matrix.config}}.bin
           cp build/${{matrix.config}}/esp-idf_build/ardupilot.elf ./ArduPlane.${{matrix.config}}.elf
           echo "### Build Copter ${{matrix.config}} :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo './waf copter' >> $GITHUB_STEP_SUMMARY  
+          echo 'waf copter' >> $GITHUB_STEP_SUMMARY  
           ./waf copter | tee >( grep -vE 'Compiling|Generat|includes.list|Parsing|Validation|Building|Linking|Detecting|linker|\*\*\*\*\*\*\*|Partition|SubType|Checking|esp-idf' --color=never --line-buffered > summary2.log)  
 
           cat summary2.log >> $GITHUB_STEP_SUMMARY  
