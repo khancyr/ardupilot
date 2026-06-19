@@ -202,30 +202,7 @@ jobs:
           git config --global --add safe.directory ${GITHUB_WORKSPACE}
           PATH="/github/home/.local/bin:$PATH"
 
-          # build the base branch
           cd base_branch
-          # configure:
-          if [ $BOOTLOADER -eq 1 ]; then
-            ./waf configure --board ${{matrix.config}} --bootloader
-          else
-            ./waf configure --board ${{matrix.config}}
-          fi
-          # build:
-          if [ $AP_PERIPH -eq 1 ]; then
-            ./waf AP_Periph
-          elif [ $BOOTLOADER -eq 1 ]; then
-            ./waf bootloader
-          else
-            ./waf
-          fi
-          mkdir -p $GITHUB_WORKSPACE/base_branch_bin
-
-          cp -r $BIN_SRC/* $GITHUB_WORKSPACE/base_branch_bin/
-
-          # build a set of binaries without symbols so we can check if
-          #  the binaries have changed.
-          echo [`date`] Building ${GITHUB_EVENT_PULL_REQUEST_BASE_REF} with no versions
-
           NO_VERSIONS_DIR="$GITHUB_WORKSPACE/base_branch_bin_no_versions"
           mkdir "$NO_VERSIONS_DIR"
 
@@ -249,8 +226,6 @@ jobs:
             ./waf
           fi
           cp -r $BIN_SRC/* "$NO_VERSIONS_DIR"
-
-          echo [`date`] Built ${GITHUB_EVENT_PULL_REQUEST_BASE_REF} with no versions
 
       - uses: actions/checkout@v6
         with:
@@ -290,27 +265,6 @@ jobs:
           git fetch --no-tags --prune --progress target_repo ${GITHUB_EVENT_PULL_REQUEST_BASE_REF}
           git rebase target_repo/${GITHUB_EVENT_PULL_REQUEST_BASE_REF}
           git submodule update --init --recursive --depth=1
-          # configure
-          if [ $BOOTLOADER -eq 1 ]; then
-            ./waf configure --board ${{matrix.config}} --bootloader
-          else
-            ./waf configure --board ${{matrix.config}}
-          fi
-          # build
-          if [ $AP_PERIPH -eq 1 ]; then
-            ./waf AP_Periph
-          elif [ $BOOTLOADER -eq 1 ]; then
-            ./waf bootloader
-          else
-            ./waf
-          fi
-          mkdir $GITHUB_WORKSPACE/pr_bin
-          cp -r $BIN_SRC/* $GITHUB_WORKSPACE/pr_bin/
-
-          # build a set of binaries without symbols so we can check if
-          #  the binaries have changed.
-          echo [`date`] Building PR with no versions
-
           NO_VERSIONS_DIR="$GITHUB_WORKSPACE/pr_bin_no_versions"
           mkdir "$NO_VERSIONS_DIR"
 
@@ -334,8 +288,6 @@ jobs:
             ./waf
           fi
           cp -r $BIN_SRC/* "$NO_VERSIONS_DIR"
-
-          echo [`date`] Built PR with no versions
 
           # build MatekF405 Plane without quadplane
           if [ "${{matrix.config}}" = "MatekF405" ]; then
@@ -393,8 +345,8 @@ jobs:
           else
               EF_BINARY_NAME="arduplane"
           fi
-          EF_BASE_BRANCH_BINARY="$GITHUB_WORKSPACE/base_branch_bin/$EF_BINARY_NAME"
-          EF_PR_BRANCH_BINARY="$GITHUB_WORKSPACE/pr_bin/$EF_BINARY_NAME"
+          EF_BASE_BRANCH_BINARY="$GITHUB_WORKSPACE/base_branch_bin_no_versions/$EF_BINARY_NAME"
+          EF_PR_BRANCH_BINARY="$GITHUB_WORKSPACE/pr_bin_no_versions/$EF_BINARY_NAME"
 
           Tools/scripts/extract_features.py "$EF_BASE_BRANCH_BINARY" --nm "${BIN_PREFIX}nm" >features-base_branch.txt
           Tools/scripts/extract_features.py "$EF_PR_BRANCH_BINARY" --nm "${BIN_PREFIX}nm" >features-pr.txt
