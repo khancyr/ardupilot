@@ -236,6 +236,11 @@ jobs:
           export GIT_VERSION="abcdef"
           export GIT_VERSION_INT="15"
 
+          if [ $BOOTLOADER -eq 1 ]; then
+            ./waf configure --board ${{matrix.config}} --bootloader --consistent-builds
+          else
+            ./waf configure --board ${{matrix.config}} --consistent-builds
+          fi
           if [ $AP_PERIPH -eq 1 ]; then
             ./waf AP_Periph
           elif [ $BOOTLOADER -eq 1 ]; then
@@ -316,6 +321,11 @@ jobs:
           export GIT_VERSION="abcdef"
           export GIT_VERSION_INT="15"
 
+          if [ $BOOTLOADER -eq 1 ]; then
+            ./waf configure --board ${{matrix.config}} --bootloader --consistent-builds
+          else
+            ./waf configure --board ${{matrix.config}} --consistent-builds
+          fi
           if [ $AP_PERIPH -eq 1 ]; then
             ./waf AP_Periph
           elif [ $BOOTLOADER -eq 1 ]; then
