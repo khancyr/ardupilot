@@ -21,6 +21,7 @@ echo "SYS_ROOT=$SYS_ROOT"
 rm -rf artifacts
 mkdir artifacts
 
+
 # cygwin doesn't work out the parallelism properly
 WAF_OPTIONS="-j8"
 
