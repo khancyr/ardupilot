@@ -21,12 +21,12 @@ jobs:
       - name: Canned size summary
         run: |
           cat > /tmp/size-summary.md <<'EOF'
-## Global Size Summary (Total Flash delta in bytes)
+          ## Global Size Summary (Total Flash delta in bytes)
 
-| Board | copter |
-| :--- | :---: |
-| Durandal | +99 |
-EOF
+          | Board | copter |
+          | :--- | :---: |
+          | Durandal | +99 |
+          EOF
 
       - name: Post size table to PR
         if: github.event_name == 'pull_request'
