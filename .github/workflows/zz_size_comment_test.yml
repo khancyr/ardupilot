@@ -18,16 +18,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Canned size summary (stands in for global_size_summary.py)
+      - name: Generate global size summary (failing generator, as in test_size.yml)
         run: |
-          cat > /tmp/size-summary.md <<'EOF'
-          ## Global Size Summary (Total Flash delta in bytes)
-
-          | Board | copter | plane | rover |
-          | :--- | :---: | :---: | :---: |
-          | Durandal | +2677 | * | -657 |
-          | MatekF405 | -128 | +2149 | _ |
-          EOF
+          python3 -c 'import sys; print("No size diff data found.", file=sys.stderr); sys.exit(1)' \
+            | tee /tmp/size-summary.md >> $GITHUB_STEP_SUMMARY
+          echo "STEP-STILL-RUNNING: generator exit was masked"
+          echo "size-summary.md is $(wc -c < /tmp/size-summary.md) bytes"
 
       - name: Post size table to PR
         if: github.event_name == 'pull_request'
