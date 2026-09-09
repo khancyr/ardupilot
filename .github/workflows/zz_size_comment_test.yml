@@ -26,7 +26,7 @@ jobs:
           | Board | copter | plane | rover |
           | :--- | :---: | :---: | :---: |
           | Durandal | +2677 | * | -657 |
-          | MatekF405 | 0 | +2149 | _ |
+          | MatekF405 | -128 | +2149 | _ |
           EOF
 
       - name: Post size table to PR
