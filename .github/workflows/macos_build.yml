@@ -55,7 +55,6 @@ on:
       - '.gitattributes'
       - '.gitignore'
       - '.pre-commit-config.yaml'
-      - '.pydevproject'
       - '.valgrind-suppressions'
       - '.valgrindrc'
       - 'Dockerfile'
@@ -122,7 +121,6 @@ on:
       - '.gitattributes'
       - '.gitignore'
       - '.pre-commit-config.yaml'
-      - '.pydevproject'
       - '.valgrind-suppressions'
       - '.valgrindrc'
       - 'Dockerfile'
@@ -169,6 +167,7 @@ jobs:
             export DO_AP_STM_ENV=0
           fi
           Tools/environment_install/install-prereqs-mac.sh -y
+          # shellcheck source=/dev/null
           source ~/.bash_profile
       - uses: ./.github/actions/setup-ccache
         with:
@@ -178,6 +177,7 @@ jobs:
           CI_BUILD_TARGET: ${{matrix.config}}
         shell: bash
         run: |
+          # shellcheck source=/dev/null
           source ~/.bash_profile
           PATH="/github/home/.local/bin:$PATH"
           echo $PATH

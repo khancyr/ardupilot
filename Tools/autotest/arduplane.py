@@ -1217,8 +1217,14 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.set_parameter("FLAP_1_SPEED", 26)  # above typical cruise of ~22 m/s
         self.set_parameter("FLIGHT_OPTIONS", 1 << 15)  # enable FLAP_ACTUAL_SPEED
         self.change_mode("FBWA")
-        self.set_rc(3, 1700)
-        self.wait_airspeed(18, 24, timeout=30)  # confirm flying below new threshold
+        # cruise throttle, not full throttle: at 1700 the aircraft settles around
+        # 26.6m/s, *above* the FLAP_1_SPEED we just set, so the flaps deploy on the
+        # way up through 26 and retract again a few seconds later.  Both assertions
+        # below then only hold during that transient, and which side of the bound
+        # the first sample lands on decides the run.
+        self.set_rc(3, 1500)
+        # a settled airspeed below the threshold, not one passing through it:
+        self.wait_airspeed(18, 24, timeout=30, minimum_duration=5)
         self.wait_servo_channel_value(servo_ch, flap_1_pwm, epsilon=pwm_epsilon, timeout=15)
 
         self.progress("Flaps retract when FLAP_ACTUAL_SPEED option is disabled")
@@ -1551,14 +1557,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.start_subtest("Test Failsafe: Deploy Parachute")
         self.load_mission("plane-parachute-mission.txt")
         self.set_current_waypoint(1)
-        self.set_parameters({
-            "CHUTE_ENABLED": 1,
-            "CHUTE_TYPE": 10,
-            "SERVO9_FUNCTION": 27,
-            "SIM_PARA_ENABLE": 1,
-            "SIM_PARA_PIN": 9,
-            "FS_LONG_ACTN": 3,
-        })
+        self.setup_simulated_parachute({"FS_LONG_ACTN": 3})
         self.change_mode("AUTO")
         self.progress("Disconnecting GCS")
         self.set_heartbeat_rate(0)
@@ -1973,16 +1972,41 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
         self.disarm_vehicle(force=True)
         self.reboot_sitl()
 
-    def Parachute(self):
-        '''Test Parachute'''
-        self.set_rc(9, 1000)
-        self.set_parameters({
+    def setup_simulated_parachute(self, extra_parameters=None):
+        '''set the vehicle and its simulated parachute up, without firing it
+
+        SIM_Parachute deploys as soon as the PWM on SIM_PARA_PIN reads 1250
+        or more, and it begins watching that pin the moment the pin number
+        is set.  Setting the pin in the same set_parameters() call as the
+        release servo's function therefore races the servo output: until
+        AP_Parachute has driven the channel to CHUTE_SERVO_OFF (1100 by
+        default, below the trigger) it still holds whatever the last test
+        left there, and anything at or above 1250 fires the chute during
+        setup.  The "BANG!" then arrives before the test starts waiting for
+        it, and the real release later in the test is silent because the
+        chute has already gone.
+
+        So configure the vehicle first, wait for the release servo to reach
+        its off position, and only then let the simulation watch the pin.
+        '''
+        parameters = {
             "CHUTE_ENABLED": 1,
             "CHUTE_TYPE": 10,
             "SERVO9_FUNCTION": 27,
-            "SIM_PARA_ENABLE": 1,
+        }
+        if extra_parameters is not None:
+            parameters.update(extra_parameters)
+        self.set_parameters(parameters)
+        self.wait_servo_channel_value(9, 1250, comparator=operator.lt, timeout=10)
+        self.set_parameters({
             "SIM_PARA_PIN": 9,
+            "SIM_PARA_ENABLE": 1,
         })
+
+    def Parachute(self):
+        '''Test Parachute'''
+        self.set_rc(9, 1000)
+        self.setup_simulated_parachute()
 
         self.load_mission("plane-parachute-mission.txt")
         self.set_current_waypoint(1)
@@ -1996,14 +2020,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
     def ParachuteSinkRate(self):
         '''Test Parachute (SinkRate triggering)'''
         self.set_rc(9, 1000)
-        self.set_parameters({
-            "CHUTE_ENABLED": 1,
-            "CHUTE_TYPE": 10,
-            "SERVO9_FUNCTION": 27,
-            "SIM_PARA_ENABLE": 1,
-            "SIM_PARA_PIN": 9,
-            "CHUTE_CRT_SINK": 9,
-        })
+        self.setup_simulated_parachute({"CHUTE_CRT_SINK": 9})
 
         self.progress("Takeoff")
         self.takeoff(alt=300)
@@ -7539,14 +7556,7 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
 
     def DO_PARACHUTE(self):
         '''test triggering parachute via mavlink'''
-        self.set_parameters({
-            "CHUTE_ENABLED": 1,
-            "CHUTE_TYPE": 10,
-            "SERVO9_FUNCTION": 27,
-            "SIM_PARA_ENABLE": 1,
-            "SIM_PARA_PIN": 9,
-            "FS_LONG_ACTN": 3,
-        })
+        self.setup_simulated_parachute({"FS_LONG_ACTN": 3})
         for command in self.run_cmd, self.run_cmd_int:
             # We release the parachute sitting on the ground, which the
             # vehicle permits only while it has never flown:
@@ -7590,6 +7600,8 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             "MAV_GCS_SYSID": self.mav.source_system,
             "AFS_TERM_ACTION": 42,
         })
+        # AFS_TERMINATE magically set-and-saved by code:
+        self.context_preserve_parameters(["AFS_TERMINATE"])
         self.wait_ready_to_arm()
         self.arm_vehicle()
         self.context_collect('STATUSTEXT')
@@ -7610,6 +7622,8 @@ class AutoTestPlane(vehicle_test_suite.TestSuite):
             "MAV_GCS_SYSID": self.mav.source_system,
             "AFS_TERM_ACTION": 42,
         })
+        # AFS_TERMINATE magically set-and-saved by code:
+        self.context_preserve_parameters(["AFS_TERMINATE"])
         self.takeoff(50, mode='TAKEOFF', timeout=200)
 
         # lock home to avoid alt messups

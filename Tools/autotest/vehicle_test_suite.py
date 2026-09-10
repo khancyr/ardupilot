@@ -14339,6 +14339,8 @@ switch value'''
             })
             self.drain_mav()
             self.assert_capability(mavutil.mavlink.MAV_PROTOCOL_CAPABILITY_FLIGHT_TERMINATION)
+            # AFS_TERMINATE magically set-and-saved by code:
+            self.context_preserve_parameters(["AFS_TERMINATE"])
             self.set_parameter("AFS_TERM_ACTION", 42)
             self.load_sample_mission()
             self.context_collect("STATUSTEXT")
@@ -14415,6 +14417,8 @@ switch value'''
             "AFS_QNH_PRESSURE": 1000,
             "AFS_AMSL_ERR_GPS": 10,
         })
+        # AFS_TERMINATE magically set-and-saved by code:
+        self.context_preserve_parameters(["AFS_TERMINATE"])
         self.wait_ready_to_arm()
         self.start_subtest("Ensuring breaking baros doesn't terminate")
         self.set_parameters({
@@ -15126,7 +15130,15 @@ switch value'''
 
         received_frsky_texts = []
         last_len_received_statustexts = 0
-        timeout = 7 * self.speedup # it can take a *long* time to get these messages down!
+        # the queue has to drain before the text we are looking for
+        # reaches us, and how long that takes is best measured in
+        # simulated time: 58s at speedup 1, 49s at 5, 39s at 10 and 20,
+        # 10s at 100 - it falls as the speedup rises.  Scaling the budget
+        # by the speedup therefore had it backwards, handing out 700s
+        # where 10 was needed and 35s where 49 was, so this failed every
+        # time at --speedup=5.  Allow a fixed 150s, comfortably above the
+        # slowest measured and still an assertion at the default speedup.
+        timeout = 150
         while True:
             self.drain_mav()
             now = self.get_sim_time_cached()
