@@ -1,0 +1,87 @@
+name: Size comment
+
+# The privileged half of the size table posting.
+#
+# "test size" builds and runs code from the pull request, so on a fork PR its
+# GITHUB_TOKEN is read-only whatever its permissions block asks for, and it
+# cannot comment.  workflow_run is used intentionally here: it runs in the
+# base-repository context, from this file as it exists on the default branch,
+# and never checks out pull request code, so it is safe to give it write
+# access.  Same split as labels-trigger.yml / labels.yml.
+#
+# It only consumes the size-summary artifact that "test size" uploads, and
+# posts it verbatim as a comment; nothing from the pull request is executed.
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: ["test size"]
+    types:
+      - completed
+
+permissions: {}
+
+concurrency:
+  # one in flight per head branch: a newer table supersedes an older one
+  group: size-comment-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    name: comment
+    # "test size" also runs on push, where there is no pull request to comment on
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-slim
+    permissions:
+      actions: read  # read the size summary artifact of the triggering run
+      pull-requests: write  # post/update the size comment
+    steps:
+      - name: Download size summary
+        id: download
+        # absent when the builds produced no table; that is not a failure
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: size-summary
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: size-summary/
+
+      - name: Post size table to PR
+        if: steps.download.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          # a fork chooses its own branch name, so it reaches the script through
+          # env, never through ${{ }} interpolation into the command line
+          HEAD_LABEL: ${{ github.event.workflow_run.head_repository.owner.login }}:${{ github.event.workflow_run.head_branch }}
+        run: |
+          SUMMARY=size-summary/size-summary.md
+          if [ ! -s "$SUMMARY" ]; then
+            echo "no size summary to post"
+            exit 0
+          fi
+
+          # workflow_run.pull_requests is empty for fork pull requests, so look
+          # the PR up by its head; that works for same-repo and fork PRs alike
+          PR=$(gh api "repos/${REPO}/pulls" -X GET \
+            -f head="$HEAD_LABEL" -f state=open --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "no open pull request for ${HEAD_LABEL}"
+            exit 0
+          fi
+
+          MARKER="<!-- size-table -->"
+          { echo "$MARKER"; cat "$SUMMARY"; } > full-comment.md
+          # --paginate because the API returns the first 30 comments only: on a
+          # busy PR ours sits past that, and missing it posts a duplicate every run
+          MATCHES=$(gh api --paginate "repos/${REPO}/issues/${PR}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${MARKER}\"))][0].id // empty")
+          # one id per matching page; keep the oldest if an earlier run left duplicates
+          EXISTING=${MATCHES%%$'\n'*}
+          if [ -n "$EXISTING" ]; then
+            gh api "repos/${REPO}/issues/comments/${EXISTING}" \
+              -X PATCH --field body=@full-comment.md
+          else
+            gh api "repos/${REPO}/issues/${PR}/comments" \
+              -X POST --field body=@full-comment.md
+          fi
