@@ -21,8 +21,11 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     permissions:
       pull-requests: write  # So we can add labels to the pull request
+    outputs:
+      pr: ${{ steps.label.outputs.pr }}
     steps:
       - uses: actions/github-script@v9
+        id: label
         with:
           script: |
             // For same-repo PRs the pull_requests array is populated directly.
@@ -50,6 +53,7 @@ jobs:
               }
               prNumber = result.data[0].number;
             }
+            core.setOutput('pr', prNumber);
 
             const filenames = (await github.paginate(github.rest.pulls.listFiles, {
               owner: context.repo.owner,
@@ -173,3 +177,62 @@ jobs:
                 labels: Array.from(labels),
               });
             }
+
+  merge-on-ci-pass:
+    name: merge-on-ci-pass
+    needs: labels-by-language
+    if: needs.labels-by-language.outputs.pr != ''
+    runs-on: ubuntu-slim
+    permissions:
+      pull-requests: write  # So we can remove the label and comment
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          PR: ${{ needs.labels-by-language.outputs.pr }}
+        with:
+          script: |
+            // "Labels Trigger" fires on opened, synchronize and reopened, so
+            // reaching here does not by itself mean the branch moved.  Compare
+            // when the label was applied with when the head last changed, and
+            // only act if the push came after: that leaves a label applied to
+            // the current head alone, including on a re-run of this workflow.
+            const LABEL = 'MergeOnCIPass';
+            const { owner, repo } = context.repo;
+            const issue_number = Number(process.env.PR);
+
+            const pr = (await github.rest.pulls.get({
+              owner, repo, pull_number: issue_number,
+            })).data;
+            if (!pr.labels.some(label => label.name === LABEL)) return;
+
+            const timeline = await github.paginate(github.rest.issues.listEventsForTimeline, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            // a plain push shows as committed, carrying the commit date; a
+            // force push shows as head_ref_force_pushed, carrying created_at
+            let labeledAt = null;
+            let movedAt = null;
+            const later = (a, b) => (!a || b > a ? b : a);
+            for (const event of timeline) {
+              if (event.event === 'labeled' && event.label && event.label.name === LABEL) {
+                labeledAt = later(labeledAt, event.created_at);
+              } else if (event.event === 'head_ref_force_pushed') {
+                movedAt = later(movedAt, event.created_at);
+              } else if (event.event === 'committed' && event.committer) {
+                movedAt = later(movedAt, event.committer.date);
+              }
+            }
+            if (!labeledAt || !movedAt || movedAt <= labeledAt) return;
+
+            try {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number, name: LABEL });
+            } catch (error) {
+              // someone else removed it between the read and here
+              core.warning(`could not remove ${LABEL} from #${issue_number}: ${error.message}`);
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: 'New commits were pushed to this branch, so the MergeOnCIPass label has been '
+                  + 'removed. Please re-request review when ready.',
+            });
