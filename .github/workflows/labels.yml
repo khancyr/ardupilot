@@ -269,19 +269,32 @@ jobs:
                 forcedAt = later(forcedAt, event.created_at);
               }
             }
-            if (!labeledAt) return;
+            if (!labeledAt) {
+              core.warning(`${LABEL} is on #${issue_number} with no event saying when; leaving it`);
+              return;
+            }
 
             // when the head arrived, not when it was written: a commit carries
             // the date its author's machine gave it, so one made before the
             // label and pushed after it would keep the label alive.  A check
             // suite is stamped by the server when the commit reaches it, and
             // every head has one -- "Labels Trigger" is itself a check.
-            const suites = (await github.rest.checks.listSuitesForRef({
-              owner, repo, ref: context.payload.workflow_run.head_sha, per_page: 100,
-            })).data.check_suites;
+            //
+            // two edges remain: a head the repository already ran checks for,
+            // pushed onto this branch without a force push, reads as old and
+            // keeps the label; and a label applied in the seconds between a
+            // push and its first suite reads as older than the head, and
+            // loses it.
+            const headSha = context.payload.workflow_run.head_sha;
+            const suites = await github.paginate(github.rest.checks.listSuitesForRef, {
+              owner, repo, ref: headSha, per_page: 100,
+            });
             let arrivedAt = null;
             for (const suite of suites) {
               if (!arrivedAt || suite.created_at < arrivedAt) arrivedAt = suite.created_at;
+            }
+            if (!arrivedAt) {
+              core.warning(`no check suite for ${headSha}; cannot tell when it arrived`);
             }
 
             const movedAt = later(arrivedAt, forcedAt);
