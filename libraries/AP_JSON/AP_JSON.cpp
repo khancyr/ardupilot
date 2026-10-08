@@ -32,9 +32,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma GCC optimize("Os")
 
 #define AP_MATH_ALLOW_DOUBLE_FUNCTIONS 1
+
+#include <AP_HAL/AP_HAL_Boards.h>
+
+#if CONFIG_HAL_BOARD != HAL_BOARD_SITL
+// favour flash size where this is built for simulation on hardware;
+// SITL builds get normal optimisation as the JSON backend parses every frame
+#pragma GCC optimize("Os")
+#endif
 
 #include "AP_JSON.h"
 #include <AP_Filesystem/AP_Filesystem.h>
@@ -93,7 +100,7 @@ AP_JSON::value *AP_JSON::load_json(const char *filename)
         delete[] buf;
         return nullptr;
     }
-    std::string err = AP_JSON::parse(*obj, start);
+    std::string err = AP_JSON::parse(*obj, start, strlen(start));
     if (!err.empty()) {
         ::printf("parse failed for json %s\n", filename);
         delete obj;
@@ -327,18 +334,21 @@ bool AP_JSON::value::evaluate_as_boolean() const
 const value &AP_JSON::value::get(const size_t idx) const
 {
     static value s_null;
-    return idx < u_.array_->size() ? (*u_.array_)[idx] : s_null;
+    return type_ == array_type && idx < u_.array_->size() ? (*u_.array_)[idx] : s_null;
 }
 
 value &AP_JSON::value::get(const size_t idx)
 {
     static value s_null;
-    return idx < u_.array_->size() ? (*u_.array_)[idx] : s_null;
+    return type_ == array_type && idx < u_.array_->size() ? (*u_.array_)[idx] : s_null;
 }
 
 const value &AP_JSON::value::get(const std::string &key) const
 {
     static value s_null;
+    if (type_ != object_type) {
+        return s_null;
+    }
     object::const_iterator i = u_.object_->find(key);
     return i != u_.object_->end() ? i->second : s_null;
 }
@@ -346,17 +356,24 @@ const value &AP_JSON::value::get(const std::string &key) const
 value &AP_JSON::value::get(const std::string &key)
 {
     static value s_null;
+    if (type_ != object_type) {
+        s_null = value();
+        return s_null;
+    }
     object::iterator i = u_.object_->find(key);
     return i != u_.object_->end() ? i->second : s_null;
 }
 
 bool AP_JSON::value::contains(const size_t idx) const
 {
-    return idx < u_.array_->size();
+    return type_ == array_type && idx < u_.array_->size();
 }
 
 bool AP_JSON::value::contains(const std::string &key) const
 {
+    if (type_ != object_type) {
+        return false;
+    }
     object::const_iterator i = u_.object_->find(key);
     return i != u_.object_->end();
 }
@@ -465,6 +482,80 @@ public:
     }
 };
 
+/*
+  input specialised for a plain character buffer, used by every caller in
+  ArduPilot. Same interface as the generic class, but each getc() is a
+  bounds check and a pointer increment; the line number is only computed
+  when an error message needs it
+ */
+template <> class input<const char *>
+{
+    const char *const start_;
+    const char *cur_;
+    const char *const end_;
+    bool consumed_;
+
+public:
+    input(const char *const &first, const char *const &last) : start_(first), cur_(first), end_(last), consumed_(false)
+    {
+    }
+    int getc()
+    {
+        if (cur_ == end_) {
+            consumed_ = false;
+            return -1;
+        }
+        consumed_ = true;
+        return *cur_++ & 0xff;
+    }
+    void ungetc()
+    {
+        if (consumed_) {
+            cur_--;
+            consumed_ = false;
+        }
+    }
+    const char *cur() const
+    {
+        return cur_;
+    }
+    int line() const
+    {
+        int line = 1;
+        for (const char *p = start_; p < cur_; p++) {
+            line += (*p == '\n');
+        }
+        return line;
+    }
+    void skip_ws()
+    {
+        while (cur_ != end_ && (*cur_ == ' ' || *cur_ == '\t' || *cur_ == '\n' || *cur_ == '\r')) {
+            cur_++;
+        }
+        consumed_ = false;
+    }
+    bool expect(const int expected)
+    {
+        skip_ws();
+        if (cur_ != end_ && (*cur_ & 0xff) == expected) {
+            cur_++;
+            consumed_ = true;
+            return true;
+        }
+        return false;
+    }
+    bool match(const std::string &pattern)
+    {
+        for (std::string::const_iterator pi(pattern.begin()); pi != pattern.end(); ++pi) {
+            if (getc() != *pi) {
+                ungetc();
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 template <typename Iter> int _parse_quadhex(input<Iter> &in)
 {
     int uni_ch = 0, hex;
@@ -485,6 +576,48 @@ template <typename Iter> int _parse_quadhex(input<Iter> &in)
         uni_ch = uni_ch * 16 + hex;
     }
     return uni_ch;
+}
+
+template <typename String, typename Iter> bool _parse_codepoint(String &out, input<Iter> &in)
+{
+    int uni_ch;
+    if ((uni_ch = _parse_quadhex(in)) == -1) {
+        return false;
+    }
+    if (0xd800 <= uni_ch && uni_ch <= 0xdfff) {
+        if (0xdc00 <= uni_ch) {
+            // a second 16-bit of a surrogate pair appeared
+            return false;
+        }
+        // first 16-bit of surrogate pair, get the next one
+        if (in.getc() != '\\' || in.getc() != 'u') {
+            in.ungetc();
+            return false;
+        }
+        const int second = _parse_quadhex(in);
+        if (!(0xdc00 <= second && second <= 0xdfff)) {
+            return false;
+        }
+        uni_ch = ((uni_ch - 0xd800) << 10) | ((second - 0xdc00) & 0x3ff);
+        uni_ch += 0x10000;
+    }
+    if (uni_ch < 0x80) {
+        out.push_back(static_cast<char>(uni_ch));
+    } else {
+        if (uni_ch < 0x800) {
+            out.push_back(static_cast<char>(0xc0 | (uni_ch >> 6)));
+        } else {
+            if (uni_ch < 0x10000) {
+                out.push_back(static_cast<char>(0xe0 | (uni_ch >> 12)));
+            } else {
+                out.push_back(static_cast<char>(0xf0 | (uni_ch >> 18)));
+                out.push_back(static_cast<char>(0x80 | ((uni_ch >> 12) & 0x3f)));
+            }
+            out.push_back(static_cast<char>(0x80 | ((uni_ch >> 6) & 0x3f)));
+        }
+        out.push_back(static_cast<char>(0x80 | (uni_ch & 0x3f)));
+    }
+    return true;
 }
 
 template <typename String, typename Iter> bool _parse_string(String &out, input<Iter> &in)
@@ -514,6 +647,11 @@ template <typename String, typename Iter> bool _parse_string(String &out, input<
                 MAP('r', '\r');
                 MAP('t', '\t');
 #undef MAP
+            case 'u':
+                if (!_parse_codepoint(out, in)) {
+                    return false;
+                }
+                break;
             default:
                 return false;
             }
@@ -555,28 +693,61 @@ template <typename Context, typename Iter> bool _parse_object(Context &ctx, inpu
         if (!in.expect('"') || !_parse_string(key, in) || !in.expect(':')) {
             return false;
         }
-        if (!ctx.parse_object_item(in, key)) {
+        if (!ctx.parse_object_item(in, std::move(key))) {
             return false;
         }
     } while (in.expect(','));
     return in.expect('}');
 }
 
-template <typename Iter> std::string _parse_number(input<Iter> &in)
+/*
+  scan a number following the JSON grammar exactly into buf, returning
+  its length, or 0 if the number is malformed or longer than buf
+ */
+template <typename Iter> size_t _scan_number(input<Iter> &in, char *buf, size_t buflen)
 {
-    std::string num_str;
-    while (1) {
-        int ch = in.getc();
-        if (('0' <= ch && ch <= '9') || ch == '+' || ch == '-' || ch == 'e' || ch == 'E') {
-            num_str.push_back(static_cast<char>(ch));
-        } else if (ch == '.') {
-            num_str.push_back('.');
-        } else {
-            in.ungetc();
-            break;
+    size_t n = 0;
+    int ch = in.getc();
+#define PUSH() do { if (n + 1 >= buflen) { return 0; } buf[n++] = char(ch); ch = in.getc(); } while (0)
+#define DIGIT() ('0' <= ch && ch <= '9')
+    if (ch == '-') {
+        PUSH();
+    }
+    if (ch == '0') {
+        PUSH();
+    } else if (DIGIT()) {
+        while (DIGIT()) {
+            PUSH();
+        }
+    } else {
+        return 0;
+    }
+    if (ch == '.') {
+        PUSH();
+        if (!DIGIT()) {
+            return 0;
+        }
+        while (DIGIT()) {
+            PUSH();
         }
     }
-    return num_str;
+    if (ch == 'e' || ch == 'E') {
+        PUSH();
+        if (ch == '+' || ch == '-') {
+            PUSH();
+        }
+        if (!DIGIT()) {
+            return 0;
+        }
+        while (DIGIT()) {
+            PUSH();
+        }
+    }
+#undef PUSH
+#undef DIGIT
+    in.ungetc();
+    buf[n] = 0;
+    return n;
 }
 
 template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter> &in)
@@ -603,19 +774,13 @@ template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter>
         return _parse_object(ctx, in);
     default:
         if (('0' <= ch && ch <= '9') || ch == '-') {
-            double f;
-            char *endp;
             in.ungetc();
-            std::string num_str(_parse_number(in));
-            if (num_str.empty()) {
+            char num[64];
+            if (_scan_number(in, num, sizeof(num)) == 0) {
                 return false;
             }
-            f = strtod(num_str.c_str(), &endp);
-            if (endp == num_str.c_str() + num_str.size()) {
-                ctx.set_number(f);
-                return true;
-            }
-            return false;
+            ctx.set_number(strtod(num, nullptr));
+            return true;
         }
         break;
     }
@@ -655,6 +820,7 @@ public:
     bool parse_array_start()
     {
         *out_ = value(array_type, false);
+        out_->get<array>().reserve(4);
         return true;
     }
     template <typename Iter> bool parse_array_item(input<Iter> &in, size_t)
@@ -673,10 +839,10 @@ public:
         *out_ = value(object_type, false);
         return true;
     }
-    template <typename Iter> bool parse_object_item(input<Iter> &in, const std::string &key)
+    template <typename Iter> bool parse_object_item(input<Iter> &in, std::string &&key)
     {
         object &o = out_->get<object>();
-        default_parse_context ctx(&o[key]);
+        default_parse_context ctx(&o[std::move(key)]);
         return _parse(ctx, in);
     }
 
@@ -710,9 +876,24 @@ template <typename Iter> Iter parse(value &out, const Iter &first, const Iter &l
     return _parse(ctx, first, last, err);
 }
 
-std::string AP_JSON::parse(value &out, const std::string &s)
+std::string AP_JSON::parse(value &out, const char *json, size_t len)
 {
     std::string err;
-    ::parse(out, s.begin(), s.end(), &err);
+    const char *end = json + len;
+    const char *p = ::parse(out, json, end, &err);
+    if (err.empty()) {
+        // only whitespace may follow the value
+        while (p != end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) {
+            p++;
+        }
+        if (p != end) {
+            err = "trailing characters after JSON value";
+        }
+    }
     return err;
+}
+
+std::string AP_JSON::parse(value &out, const std::string &s)
+{
+    return parse(out, s.data(), s.size());
 }
