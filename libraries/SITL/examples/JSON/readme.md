@@ -64,7 +64,8 @@ This is a example input frame, it should be preceded by and terminated with a ca
 {"timestamp":2500,"imu":{"gyro":[0,0,0],"accel_body":[0,0,0]},"position":[0,0,0],"attitude":[0,0,0],"velocity":[0,0,0]}
 ```
 
-The order of fields is not important.
+The order of fields is not important. A packet must be on a single line:
+a newline inside a packet ends it, and the packet is rejected.
 Note that the timestamp is the absolute physics time, not the timestep.
 
 It is possible to send optional fields to provide data for additional sensors, in most cases this will require setting the relevant sensor type param to the SITL driver.
@@ -151,6 +152,12 @@ errors are below the resolution of typical real sensors:
 
 In Python, `json.dumps(round(x, 4))` writes the shortest form of the
 rounded value, e.g. `0.0123`.
+
+Rounding also makes packets cheaper to parse on a microcontroller.
+Numbers with at most 7 significant digits (15 for latitude, longitude,
+altitude, position and timestamp) are converted without calling strtof
+or strtod; on a Cortex-M4 that is about 200 instructions per number,
+against about 3000 for a 17 digit number from `json.dumps`.
 
 ### Short keys
 

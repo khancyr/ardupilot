@@ -22,8 +22,6 @@
 
 #include "SIM_JSON.h"
 
-#include <AP_JSON/AP_JSON.h>
-#include <AP_Math/crc.h>
 
 #include <stdio.h>
 #include <arpa/inet.h>
@@ -141,83 +139,14 @@ void JSON::output_servos(const struct sitl_input &input)
 
 
 /*
-  read exactly count numbers from a JSON array
- */
-static bool json_numbers(const AP_JSON::value &v, double *out, uint8_t count)
-{
-    if (!v.is<AP_JSON::value::array>()) {
-        return false;
-    }
-    const AP_JSON::value::array &a = v.get<AP_JSON::value::array>();
-    if (a.size() != count) {
-        return false;
-    }
-    for (uint8_t i=0; i<count; i++) {
-        if (!a[i].is<double>()) {
-            return false;
-        }
-        out[i] = a[i].get<double>();
-    }
-    return true;
-}
-
-/*
-  check and strip an optional "*XXXX" suffix after the JSON object,
-  where XXXX is the CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) of all
-  bytes before the '*', in hex. This is the same as Python's
-  binascii.crc_hqx(data, 0xFFFF). Trailing whitespace is allowed.
-
-  Returns false if a suffix is present and the CRC does not match. On
-  success len is reduced to exclude the suffix
- */
-bool JSON::check_crc_suffix(const char *json, size_t &len)
-{
-    size_t end = len;
-    while (end > 0 && (json[end-1] == ' ' || json[end-1] == '\t' || json[end-1] == '\r')) {
-        end--;
-    }
-    if (end < 5 || json[end-5] != '*') {
-        // no suffix, accepted as is
-        return true;
-    }
-    uint16_t sent = 0;
-    for (uint8_t i=0; i<4; i++) {
-        const char c = json[end-4+i];
-        uint8_t nibble;
-        if (c >= '0' && c <= '9') {
-            nibble = c - '0';
-        } else if (c >= 'a' && c <= 'f') {
-            nibble = c - 'a' + 10;
-        } else if (c >= 'A' && c <= 'F') {
-            nibble = c - 'A' + 10;
-        } else {
-            // not a CRC suffix; let the JSON parser report the problem
-            return true;
-        }
-        sent = (sent << 4) | nibble;
-    }
-    len = end - 5;
-    const uint16_t crc = crc16_ccitt((const uint8_t *)json, len, 0xFFFF);
-    if (crc != sent) {
-        crc_error_count++;
-        if (report_parse_error()) {
-            printf("JSON: sensor packet CRC mismatch (got %04X, expected %04X), %u errors\n",
-                   unsigned(sent), unsigned(crc), unsigned(crc_error_count));
-        }
-        return false;
-    }
-    return true;
-}
-
-/*
   hold the last value of slow changing optional fields for FIELD_HOLD_S
   of physics time, so a physics backend can send them at a lower rate
   than the main state. Returns the bitmask of fields to use
  */
 uint64_t JSON::hold_fields(uint64_t received_bitmask)
 {
-    uint64_t fields = received_bitmask;
-    for (uint8_t i=0; i<ARRAY_SIZE(keytable); i++) {
+    uint64_t use = received_bitmask;
+    for (uint8_t i=0; i<ARRAY_SIZE(fields); i++) {
         const uint64_t bit = 1ULL << i;
         if (received_bitmask & bit) {
             field_received_s[i] = state.timestamp_s;
@@ -225,10 +154,10 @@ uint64_t JSON::hold_fields(uint64_t received_bitmask)
                    (last_received_bitmask & bit) &&
                    state.timestamp_s >= field_received_s[i] &&  // not after a physics reset
                    state.timestamp_s - field_received_s[i] <= FIELD_HOLD_S) {
-            fields |= bit;
+            use |= bit;
         }
     }
-    return fields;
+    return use;
 }
 
 // rate limit reports of bad sensor packets to 1Hz
@@ -242,10 +171,8 @@ bool JSON::report_parse_error()
     return true;
 }
 
-uint64_t JSON::parse_sensors(const char *json)
+uint64_t JSON::parse_sensors(const uint8_t *data, size_t len)
 {
-    uint64_t received_bitmask = 0;
-
 #if SITL_JSON_DEBUG && AP_FILESYSTEM_FILE_WRITING_ENABLED
     // it is useful in some environments to be able to get a copy of the raw
     // JSON data
@@ -256,118 +183,49 @@ uint64_t JSON::parse_sensors(const char *json)
         auto &fs = AP::FS();
         int fd = fs.open("json_debug.txt", O_WRONLY|O_CREAT|O_TRUNC);
         if (fd != -1) {
-            fs.write(fd, json, strlen(json));
+            fs.write(fd, data, len);
             fs.close(fd);
         }
     }
 #endif
 
-    size_t len = strlen(json);
-    if (!check_crc_suffix(json, len)) {
-        return 0;
-    }
+    uint64_t received_bitmask = 0;
+    for (size_t i=0; i<len; i++) {
+        switch (parser.feed(data[i])) {
+        case AP_JSON_FieldParser::Result::NONE:
+            break;
 
-    AP_JSON::value root;
-    const std::string err = AP_JSON::parse(root, json, len);
-    if (!err.empty() || !root.is<AP_JSON::value::object>()) {
-        if (report_parse_error()) {
-            printf("JSON: rejected sensor packet: %s\n", err.empty() ? "not a JSON object" : err.c_str());
-        }
-        return 0;
-    }
-
-    // restore state if the packet is rejected part way through, so a
-    // bad packet never leaves partially updated values behind
-    const auto saved_state = state;
-
-    for (uint16_t i=0; i<ARRAY_SIZE(keytable); i++) {
-        struct keytable &key = keytable[i];
-
-        // keys with an empty section live in the root object; get()
-        // returns null if the section is not an object or the key is
-        // absent. If the full name is absent try the short alias, which
-        // always lives in the root object
-        const AP_JSON::value &section = key.section[0] ? root.get(key.section) : root;
-        const AP_JSON::value &full = section.get(key.key);
-        const AP_JSON::value &v = (full.is<AP_JSON::null>() && key.alias != nullptr) ? root.get(key.alias) : full;
-        if (v.is<AP_JSON::null>()) {
-            if (key.required) {
+        case AP_JSON_FieldParser::Result::PACKET:
+            if ((parser.found() & REQUIRED_FIELDS) != REQUIRED_FIELDS) {
+                rejected_packets++;
                 if (report_parse_error()) {
-                    printf("JSON: sensor packet missing %s%s%s\n", key.section, key.section[0] ? "/" : "", key.key);
+                    printf("JSON: sensor packet missing:");
+                    for (uint8_t f=0; f<ARRAY_SIZE(fields); f++) {
+                        if ((REQUIRED_FIELDS & ~parser.found()) & (1ULL << f)) {
+                            printf(" %s", fields[f].path);
+                        }
+                    }
+                    printf("\n");
                 }
-                state = saved_state;
-                return 0;
+                state_rx = state;
+                break;
             }
-            continue;
-        }
-
-        double n[4];
-        bool ok = false;
-        switch (key.type) {
-        case DATA_UINT64:
-            if ((ok = v.is<double>())) {
-                *((uint64_t *)key.ptr) = uint64_t(v.get<double>());
-            }
+            // a complete, valid packet: it becomes the current state
+            state = state_rx;
+            received_bitmask = parser.found();
             break;
 
-        case DATA_FLOAT:
-            if ((ok = v.is<double>())) {
-                *((float *)key.ptr) = float(v.get<double>());
-            }
-            break;
-
-        case DATA_DOUBLE:
-            if ((ok = v.is<double>())) {
-                *((double *)key.ptr) = v.get<double>();
-            }
-            break;
-
-        case DATA_VECTOR3F:
-            if ((ok = json_numbers(v, n, 3))) {
-                *((Vector3f *)key.ptr) = Vector3f(n[0], n[1], n[2]);
-            }
-            break;
-
-        case DATA_VECTOR3D:
-            if ((ok = json_numbers(v, n, 3))) {
-                *((Vector3d *)key.ptr) = Vector3d(n[0], n[1], n[2]);
-            }
-            break;
-
-        case QUATERNION:
-            if ((ok = json_numbers(v, n, 4))) {
-                Quaternion *q = static_cast<Quaternion*>(key.ptr);
-                q->q1 = n[0];
-                q->q2 = n[1];
-                q->q3 = n[2];
-                q->q4 = n[3];
-            }
-            break;
-
-        case BOOLEAN:
-            // true/false, or a number for backends that send 0/1
-            if (v.is<bool>()) {
-                *((bool *)key.ptr) = v.get<bool>();
-                ok = true;
-            } else if (v.is<double>()) {
-                *((bool *)key.ptr) = !is_zero(v.get<double>());
-                ok = true;
-            }
-            break;
-        }
-
-        if (!ok) {
+        case AP_JSON_FieldParser::Result::ERROR:
+            rejected_packets++;
             if (report_parse_error()) {
-                printf("JSON: sensor packet has wrong type for %s%s%s\n", key.section, key.section[0] ? "/" : "", key.key);
+                printf("JSON: rejected sensor packet: %s, %u rejected\n",
+                       parser.error(), unsigned(rejected_packets));
             }
-            state = saved_state;
-            return 0;
+            // undo whatever the bad packet had written
+            state_rx = state;
+            break;
         }
-
-        // record the keys that are found
-        received_bitmask |= 1ULL << i;
     }
-
     return received_bitmask;
 }
 
@@ -378,7 +236,7 @@ uint64_t JSON::parse_sensors(const char *json)
 void JSON::recv_fdm(const struct sitl_input &input)
 {
     // Receive sensor packet
-    ssize_t ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, UDP_TIMEOUT_MS);
+    ssize_t ret = sock.recv(recv_buffer, sizeof(recv_buffer), UDP_TIMEOUT_MS);
     uint32_t wait_ms = UDP_TIMEOUT_MS;
 
     if (state.no_lockstep && ret <= 0) {
@@ -395,7 +253,7 @@ void JSON::recv_fdm(const struct sitl_input &input)
 
     while (ret <= 0) {
         //printf("No JSON sensor message received - %s\n", strerror(errno));
-        ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, UDP_TIMEOUT_MS);
+        ret = sock.recv(recv_buffer, sizeof(recv_buffer), UDP_TIMEOUT_MS);
         wait_ms += UDP_TIMEOUT_MS;
         // if no sensor message is received after 10 second resend servos, this help cope with SITL and the physics getting out of sync
         if (wait_ms > 1000) {
@@ -405,25 +263,10 @@ void JSON::recv_fdm(const struct sitl_input &input)
         }
     }
 
-    // convert '\n' into nul
-    while (uint8_t *p = (uint8_t *)memchr(&sensor_buffer[sensor_buffer_len], '\n', ret)) {
-        *p = 0;
-    }
-    sensor_buffer_len += ret;
-
-    const uint8_t *p2 = (const uint8_t *)memrchr(sensor_buffer, 0, sensor_buffer_len);
-    if (p2 == nullptr || p2 == sensor_buffer) {
-        return;
-    }
-
-    const uint8_t *p1 = (const uint8_t *)memrchr(sensor_buffer, 0, p2 - sensor_buffer);
-    if (p1 == nullptr) {
-        return;
-    }
-
-    uint64_t received_bitmask = parse_sensors((const char *)(p1+1));
+    // the parser keeps any partial packet for the next datagram
+    uint64_t received_bitmask = parse_sensors(recv_buffer, ret);
     if (received_bitmask == 0) {
-        // invalid, or missing mandatory fields; parse_sensors() reports why
+        // no complete valid packet yet; parse_sensors() reports bad ones
         return;
     }
     received_bitmask = hold_fields(received_bitmask);
@@ -437,23 +280,14 @@ void JSON::recv_fdm(const struct sitl_input &input)
     if (received_bitmask != last_received_bitmask) {
         // some change in the message we have received, print what we got
         printf("\nJSON received:\n");
-        for (uint16_t i=0; i<ARRAY_SIZE(keytable); i++) {
-            struct keytable &key = keytable[i];
-            if ((received_bitmask &  1ULL << i) == 0) {
-                continue;
-            }
-            if (strcmp(key.section, "") == 0) {
-                printf("\t%s\n",key.key);
-            } else {
-                printf("\t%s: %s\n",key.section,key.key);
+        for (uint8_t i=0; i<ARRAY_SIZE(fields); i++) {
+            if ((received_bitmask & (1ULL << i)) != 0) {
+                printf("\t%s\n", fields[i].path);
             }
         }
         printf("\n");
     }
     last_received_bitmask = received_bitmask;
-
-    memmove(sensor_buffer, p2, sensor_buffer_len - (p2 - sensor_buffer));
-    sensor_buffer_len = sensor_buffer_len - (p2 - sensor_buffer);
 
     accel_body = state.imu.accel_body;
     gyro = state.imu.gyro;
