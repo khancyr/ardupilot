@@ -114,7 +114,7 @@ The controller can optionally provide R/C input data, up to 12
 channels.
 
 ```json
-"rc":{"rc_1":1500,"rc_2":1500,"rc_3":1000,"rc_4":1500,"rc_5":1000,"rc_6":1000,"rc_7":1000,"rc_8":1500,rc_9":1500,"rc_10":1500}
+"rc":{"rc_1":1500,"rc_2":1500,"rc_3":1000,"rc_4":1500,"rc_5":1000,"rc_6":1000,"rc_7":1000,"rc_8":1500,"rc_9":1500,"rc_10":1500}
 ```
 
 ## Battery

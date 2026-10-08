@@ -205,6 +205,10 @@ private:
     };
     uint64_t last_received_bitmask;
 
+    // rate limits reports of rejected sensor packets
+    uint32_t last_parse_error_ms;
+    bool report_parse_error();
+
 #if SITL_JSON_DEBUG
     uint32_t last_debug_ms;
 #endif

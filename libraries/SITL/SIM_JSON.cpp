@@ -22,6 +22,8 @@
 
 #include "SIM_JSON.h"
 
+#include <AP_JSON/AP_JSON.h>
+
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -138,39 +140,34 @@ void JSON::output_servos(const struct sitl_input &input)
 
 
 /*
-    very simple JSON parser for sensor data
-    called with pointer to one row of sensor data, nul terminated
-
-    This parser does not do any syntax checking, and is not at all
-    general purpose
-*/
-
-template <typename T>
-bool parse_array(const char *str, T &arr, int count) {
-    const char *p = str;
-
-    for (int i = 0; i < count; i++) {
-        // Skip to start of number
-        while (*p && *p != '-' && (*p < '0' || *p > '9'))
-            p++;
-
-        if (!*p) {
-            // End of string before we got all numbers
+  read exactly count numbers from a JSON array
+ */
+static bool json_numbers(const AP_JSON::value &v, double *out, uint8_t count)
+{
+    if (!v.is<AP_JSON::value::array>()) {
+        return false;
+    }
+    const AP_JSON::value::array &a = v.get<AP_JSON::value::array>();
+    if (a.size() != count) {
+        return false;
+    }
+    for (uint8_t i=0; i<count; i++) {
+        if (!a[i].is<double>()) {
             return false;
         }
-
-        arr[i] = strtod(p, nullptr);
-
-        // Move past the number
-        while (*p && *p != ',' && *p != ']')
-            p++;
-
-        if (i < count - 1) { // expect comma between numbers
-            if (*p != ',') return false;
-            p++; // skip comma
-        }
+        out[i] = a[i].get<double>();
     }
+    return true;
+}
 
+// rate limit reports of bad sensor packets to 1Hz
+bool JSON::report_parse_error()
+{
+    const uint32_t now_ms = AP_HAL::millis();
+    if (now_ms - last_parse_error_ms < 1000) {
+        return false;
+    }
+    last_parse_error_ms = now_ms;
     return true;
 }
 
@@ -194,103 +191,102 @@ uint64_t JSON::parse_sensors(const char *json)
     }
 #endif
 
-    //printf("%s\n", json);
+    AP_JSON::value root;
+    const std::string err = AP_JSON::parse(root, json, strlen(json));
+    if (!err.empty() || !root.is<AP_JSON::value::object>()) {
+        if (report_parse_error()) {
+            printf("JSON: rejected sensor packet: %s\n", err.empty() ? "not a JSON object" : err.c_str());
+        }
+        return 0;
+    }
+
+    // restore state if the packet is rejected part way through, so a
+    // bad packet never leaves partially updated values behind
+    const auto saved_state = state;
+
     for (uint16_t i=0; i<ARRAY_SIZE(keytable); i++) {
         struct keytable &key = keytable[i];
 
-        /* look for section header */
-        const char *p = strstr(json, key.section);
-        if (!p) {
-            // we don't have this sensor
+        // keys with an empty section live in the root object; get()
+        // returns null if the section is not an object or the key is absent
+        const AP_JSON::value &section = key.section[0] ? root.get(key.section) : root;
+        const AP_JSON::value &v = section.get(key.key);
+        if (v.is<AP_JSON::null>()) {
             if (key.required) {
-                printf("Failed to find %s\n", key.section);
+                if (report_parse_error()) {
+                    printf("JSON: sensor packet missing %s%s%s\n", key.section, key.section[0] ? "/" : "", key.key);
+                }
+                state = saved_state;
                 return 0;
             }
             continue;
         }
-        p += strlen(key.section)+1;
 
-        // find key inside section
-        p = strstr(p, key.key);
-        if (!p) {
-            if (key.required) {
-                printf("Failed to find key %s/%s\n", key.section, key.key);
-                return 0;
+        double n[4];
+        bool ok = false;
+        switch (key.type) {
+        case DATA_UINT64:
+            if ((ok = v.is<double>())) {
+                *((uint64_t *)key.ptr) = uint64_t(v.get<double>());
             }
-            continue;
+            break;
+
+        case DATA_FLOAT:
+            if ((ok = v.is<double>())) {
+                *((float *)key.ptr) = float(v.get<double>());
+            }
+            break;
+
+        case DATA_DOUBLE:
+            if ((ok = v.is<double>())) {
+                *((double *)key.ptr) = v.get<double>();
+            }
+            break;
+
+        case DATA_VECTOR3F:
+            if ((ok = json_numbers(v, n, 3))) {
+                *((Vector3f *)key.ptr) = Vector3f(n[0], n[1], n[2]);
+            }
+            break;
+
+        case DATA_VECTOR3D:
+            if ((ok = json_numbers(v, n, 3))) {
+                *((Vector3d *)key.ptr) = Vector3d(n[0], n[1], n[2]);
+            }
+            break;
+
+        case QUATERNION:
+            if ((ok = json_numbers(v, n, 4))) {
+                Quaternion *q = static_cast<Quaternion*>(key.ptr);
+                q->q1 = n[0];
+                q->q2 = n[1];
+                q->q3 = n[2];
+                q->q4 = n[3];
+            }
+            break;
+
+        case BOOLEAN:
+            // true/false, or a number for backends that send 0/1
+            if (v.is<bool>()) {
+                *((bool *)key.ptr) = v.get<bool>();
+                ok = true;
+            } else if (v.is<double>()) {
+                *((bool *)key.ptr) = !is_zero(v.get<double>());
+                ok = true;
+            }
+            break;
+        }
+
+        if (!ok) {
+            if (report_parse_error()) {
+                printf("JSON: sensor packet has wrong type for %s%s%s\n", key.section, key.section[0] ? "/" : "", key.key);
+            }
+            state = saved_state;
+            return 0;
         }
 
         // record the keys that are found
         received_bitmask |= 1ULL << i;
-
-        p += strlen(key.key)+2;
-        switch (key.type) {
-            case DATA_UINT64:
-                *((uint64_t *)key.ptr) = strtoull(p, nullptr, 10);
-                //printf("%s/%s = %lu\n", key.section, key.key, *((uint64_t *)key.ptr));
-                break;
-
-            case DATA_FLOAT:
-                *((float *)key.ptr) = strtof(p, nullptr);
-                //printf("%s/%s = %f\n", key.section, key.key, *((float *)key.ptr));
-                break;
-
-            case DATA_DOUBLE:
-                *((double *)key.ptr) = atof(p);
-                //printf("%s/%s = %f\n", key.section, key.key, *((double *)key.ptr));
-                break;
-
-            case DATA_VECTOR3F: {
-                Vector3<float> v;
-                if (!parse_array(p, v, ARRAY_SIZE(v))) {
-                    printf("Failed to parse Vector3f for %s/%s\n", key.section, key.key);
-                    return received_bitmask;
-                }
-                Vector3f *tv = (Vector3<float> *)key.ptr;
-                *tv = v;
-                //printf("%s/%s = %f, %f, %f\n", key.section, key.key, v->x, v->y, v->z);
-                break;
-            }
-
-            case DATA_VECTOR3D: {
-                Vector3<double> v;
-                if (!parse_array(p, v, ARRAY_SIZE(v))) {
-                    printf("Failed to parse Vector3d for %s/%s\n", key.section, key.key);
-                    return received_bitmask;
-                }
-                Vector3d *tv = (Vector3d *)key.ptr;
-                *tv = v;
-                //printf("%s/%s = %f, %f, %f\n", key.section, key.key, v->x, v->y, v->z);
-                break;
-            }
-
-            case QUATERNION: {
-                VectorN<float, 4> v;
-                if (!parse_array(p, v, ARRAY_SIZE(v))) {
-                    printf("Failed to parse Vector4f for %s/%s\n", key.section, key.key);
-                    return received_bitmask;
-                }
-                Quaternion *tv = static_cast<Quaternion*>(key.ptr);
-                tv->q1 = v[0];
-                tv->q2 = v[1];
-                tv->q3 = v[2];
-                tv->q4 = v[3];
-                break;
-            }
-
-            case BOOLEAN: {
-                bool *b = (bool *)key.ptr;
-                if (strncasecmp(p, "true", 4) == 0) {
-                    *b = true;
-                } else if (strncasecmp(p, "false", 5) == 0) {
-                    *b = false;
-                } else {
-                    *b = strtoull(p, nullptr, 10) != 0;
-                }
-                //printf("%s/%s = %i\n", key.section, key.key, *((unit8_t *)key.ptr));
-                break;
-            }
-        }
     }
 
     return received_bitmask;
@@ -348,8 +344,7 @@ void JSON::recv_fdm(const struct sitl_input &input)
 
     const uint64_t received_bitmask = parse_sensors((const char *)(p1+1));
     if (received_bitmask == 0) {
-        // did not receive one of the mandatory fields
-        printf("Did not contain all mandatory fields\n");
+        // invalid, or missing mandatory fields; parse_sensors() reports why
         return;
     }
 
