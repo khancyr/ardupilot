@@ -118,50 +118,53 @@ private:
         bool no_lockstep;
     } state;
 
-    // table to aid parsing of JSON sensor data
+    // table to aid parsing of JSON sensor data. Each field may also be
+    // sent under a short alias in the root object, to keep packets small
+    // on slow links; see examples/JSON/readme.md
     struct keytable {
         const char *section;
         const char *key;
+        const char *alias;
         void *ptr;
         enum data_type type;
         bool required;
     } keytable[36] {
-        { "", "timestamp", &state.timestamp_s, DATA_DOUBLE, true },
-        { "", "latitude", &state.latitude, DATA_DOUBLE, false },
-        { "", "longitude", &state.longitude, DATA_DOUBLE, false },
-        { "", "altitude", &state.altitude, DATA_DOUBLE, false },
-        { "imu", "gyro",    &state.imu.gyro, DATA_VECTOR3F, true },
-        { "imu", "accel_body", &state.imu.accel_body, DATA_VECTOR3F, true },
-        { "", "position", &state.position, DATA_VECTOR3D, false },
-        { "", "attitude", &state.attitude, DATA_VECTOR3F, false },
-        { "", "quaternion", &state.quaternion, QUATERNION, false },
-        { "", "velocity", &state.velocity, DATA_VECTOR3F, true },
-        { "", "rng_1", &state.rng[0], DATA_FLOAT, false },
-        { "", "rng_2", &state.rng[1], DATA_FLOAT, false },
-        { "", "rng_3", &state.rng[2], DATA_FLOAT, false },
-        { "", "rng_4", &state.rng[3], DATA_FLOAT, false },
-        { "", "rng_5", &state.rng[4], DATA_FLOAT, false },
-        { "", "rng_6", &state.rng[5], DATA_FLOAT, false },
-        {"","velocity_wind", &state.velocity_wind, DATA_VECTOR3F, false},
-        {"windvane","direction", &state.wind_vane_apparent.direction, DATA_FLOAT, false},
-        {"windvane","speed", &state.wind_vane_apparent.speed, DATA_FLOAT, false},
-        {"", "airspeed", &state.airspeed, DATA_FLOAT, false},
-        {"", "no_time_sync", &state.no_time_sync, BOOLEAN, false},
-        {"", "no_lockstep", &state.no_lockstep, BOOLEAN, false},
-        { "rc", "rc_1", &state.rc[0], DATA_FLOAT, false },
-        { "rc", "rc_2", &state.rc[1], DATA_FLOAT, false },
-        { "rc", "rc_3", &state.rc[2], DATA_FLOAT, false },
-        { "rc", "rc_4", &state.rc[3], DATA_FLOAT, false },
-        { "rc", "rc_5", &state.rc[4], DATA_FLOAT, false },
-        { "rc", "rc_6", &state.rc[5], DATA_FLOAT, false },
-        { "rc", "rc_7", &state.rc[6], DATA_FLOAT, false },
-        { "rc", "rc_8", &state.rc[7], DATA_FLOAT, false },
-        { "rc", "rc_9", &state.rc[8], DATA_FLOAT, false },
-        { "rc", "rc_10", &state.rc[9], DATA_FLOAT, false },
-        { "rc", "rc_11", &state.rc[10], DATA_FLOAT, false },
-        { "rc", "rc_12", &state.rc[11], DATA_FLOAT, false },
-        { "battery", "voltage", &state.bat_volt, DATA_FLOAT, false },
-        { "battery", "current", &state.bat_amp, DATA_FLOAT, false },
+        { "", "timestamp", "t", &state.timestamp_s, DATA_DOUBLE, true },
+        { "", "latitude", "lat", &state.latitude, DATA_DOUBLE, false },
+        { "", "longitude", "lon", &state.longitude, DATA_DOUBLE, false },
+        { "", "altitude", "alt", &state.altitude, DATA_DOUBLE, false },
+        { "imu", "gyro", "g", &state.imu.gyro, DATA_VECTOR3F, true },
+        { "imu", "accel_body", "a", &state.imu.accel_body, DATA_VECTOR3F, true },
+        { "", "position", "p", &state.position, DATA_VECTOR3D, false },
+        { "", "attitude", "e", &state.attitude, DATA_VECTOR3F, false },
+        { "", "quaternion", "q", &state.quaternion, QUATERNION, false },
+        { "", "velocity", "v", &state.velocity, DATA_VECTOR3F, true },
+        { "", "rng_1", "r1", &state.rng[0], DATA_FLOAT, false },
+        { "", "rng_2", "r2", &state.rng[1], DATA_FLOAT, false },
+        { "", "rng_3", "r3", &state.rng[2], DATA_FLOAT, false },
+        { "", "rng_4", "r4", &state.rng[3], DATA_FLOAT, false },
+        { "", "rng_5", "r5", &state.rng[4], DATA_FLOAT, false },
+        { "", "rng_6", "r6", &state.rng[5], DATA_FLOAT, false },
+        { "", "velocity_wind", "vw", &state.velocity_wind, DATA_VECTOR3F, false },
+        { "windvane", "direction", "wd", &state.wind_vane_apparent.direction, DATA_FLOAT, false },
+        { "windvane", "speed", "ws", &state.wind_vane_apparent.speed, DATA_FLOAT, false },
+        { "", "airspeed", "as", &state.airspeed, DATA_FLOAT, false },
+        { "", "no_time_sync", nullptr, &state.no_time_sync, BOOLEAN, false },
+        { "", "no_lockstep", nullptr, &state.no_lockstep, BOOLEAN, false },
+        { "rc", "rc_1", "c1", &state.rc[0], DATA_FLOAT, false },
+        { "rc", "rc_2", "c2", &state.rc[1], DATA_FLOAT, false },
+        { "rc", "rc_3", "c3", &state.rc[2], DATA_FLOAT, false },
+        { "rc", "rc_4", "c4", &state.rc[3], DATA_FLOAT, false },
+        { "rc", "rc_5", "c5", &state.rc[4], DATA_FLOAT, false },
+        { "rc", "rc_6", "c6", &state.rc[5], DATA_FLOAT, false },
+        { "rc", "rc_7", "c7", &state.rc[6], DATA_FLOAT, false },
+        { "rc", "rc_8", "c8", &state.rc[7], DATA_FLOAT, false },
+        { "rc", "rc_9", "c9", &state.rc[8], DATA_FLOAT, false },
+        { "rc", "rc_10", "c10", &state.rc[9], DATA_FLOAT, false },
+        { "rc", "rc_11", "c11", &state.rc[10], DATA_FLOAT, false },
+        { "rc", "rc_12", "c12", &state.rc[11], DATA_FLOAT, false },
+        { "battery", "voltage", "bv", &state.bat_volt, DATA_FLOAT, false },
+        { "battery", "current", "bc", &state.bat_amp, DATA_FLOAT, false },
     };
 
     // Enum coresponding to the ordering of keys in the keytable.
@@ -204,6 +207,27 @@ private:
         BAT_AMP     = 0x0000000800000000ULL, // 1ULL << 35
     };
     uint64_t last_received_bitmask;
+
+    /*
+      Slow changing optional fields do not need to be sent in every
+      packet: their last value is held for FIELD_HOLD_S of physics time.
+      Fields describing the vehicle state (attitude, position and so
+      on) are never held, as a stale value would be silently wrong.
+     */
+    static constexpr double FIELD_HOLD_S = 0.5;
+    static const uint64_t HOLDABLE_FIELDS =
+        RNG_1 | RNG_2 | RNG_3 | RNG_4 | RNG_5 | RNG_6 |
+        WIND_VEL | WIND_DIR | WIND_SPD | AIRSPEED | TIME_SYNC | LOCKSTEP |
+        RC_1 | RC_2 | RC_3 | RC_4 | RC_5 | RC_6 |
+        RC_7 | RC_8 | RC_9 | RC_10 | RC_11 | RC_12 |
+        BAT_VOLT | BAT_AMP;
+    double field_received_s[ARRAY_SIZE(keytable)];
+    uint64_t hold_fields(uint64_t received_bitmask);
+
+    // optional "*XXXX" CRC suffix on a sensor packet, for links without
+    // their own integrity check
+    bool check_crc_suffix(const char *json, size_t &len);
+    uint32_t crc_error_count;
 
     // rate limits reports of rejected sensor packets
     uint32_t last_parse_error_ms;

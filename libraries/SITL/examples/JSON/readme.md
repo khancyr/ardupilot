@@ -126,6 +126,88 @@ Volts, current in Amps:
 "battery":{"voltage":50.39,"current":64.01}
 ```
 
+## Compact packets for slow links
+
+Over a local UDP socket packet size does not matter, but over a serial
+or radio link a 400Hz stream of full precision JSON does not fit. A
+packet with the mandatory fields written by Python's `json.dumps` is
+about 400 bytes; the options below bring it to about 150 bytes while
+keeping it plain JSON. They can be used together or separately, and
+packets using them are still accepted over UDP.
+
+### Precision
+
+Send each value only to the precision that matters. These rounding
+errors are below the resolution of typical real sensors:
+
+| Field | Decimals | Max error |
+| --- | --- | --- |
+| timestamp (s) | 6 | 0.5 us |
+| gyro (rad/s), attitude (rad) | 4 | 5e-5 |
+| quaternion | 5 | 5e-6 |
+| accel_body (m/s^2), position (m), velocity (m/s), rangefinders (m) | 3 | 0.5e-3 |
+| latitude, longitude (deg) | 7 | about 1cm |
+| altitude, airspeed, wind, battery | 2 | 5e-3 |
+
+In Python, `json.dumps(round(x, 4))` writes the shortest form of the
+rounded value, e.g. `0.0123`.
+
+### Short keys
+
+Every field can also be sent under a short key in the root object.
+If both the full name and the short key are present the full name is
+used.
+
+| Short key | Field | Short key | Field |
+| --- | --- | --- | --- |
+| `t` | timestamp | `r1` .. `r6` | rng_1 .. rng_6 |
+| `g` | imu: gyro | `vw` | velocity_wind |
+| `a` | imu: accel_body | `wd` | windvane: direction |
+| `p` | position | `ws` | windvane: speed |
+| `v` | velocity | `as` | airspeed |
+| `e` | attitude | `c1` .. `c12` | rc: rc_1 .. rc_12 |
+| `q` | quaternion | `bv` | battery: voltage |
+| `lat`, `lon`, `alt` | latitude, longitude, altitude | `bc` | battery: current |
+
+For example, 148 bytes instead of about 400:
+
+```json
+{"t":12.0025,"g":[0.0123,-0.2311,0.0457],"a":[0.312,-0.088,-9.803],"p":[123.456,-45.678,-10.5],"v":[1.234,-0.567,0.012],"e":[0.0123,-0.0456,1.5708]}
+```
+
+### Sending slow fields less often
+
+The rangefinders, wind, windvane, airspeed, RC, battery and the
+`no_time_sync` / `no_lockstep` flags keep their last value for 0.5s of
+physics time after they were last received. They can be sent at a
+lower rate than the vehicle state, for example every 8th packet at
+400Hz. The vehicle state fields (timestamp, imu, position, velocity,
+attitude, quaternion, latitude, longitude, altitude) are never held
+and must be in every packet that needs them.
+
+### Checksum
+
+A UDP datagram has its own checksum but a serial link does not, and a
+single flipped bit in a digit gives a different number that is still
+valid JSON. A packet may end with `*` and four hex digits after the
+closing brace:
+
+```text
+{"t":12.0025,...}*1A2B
+```
+
+The value is the CRC-16/CCITT-FALSE (polynomial 0x1021, initial value
+0xFFFF) of every byte before the `*`. Packets with a wrong checksum
+are dropped. In Python:
+
+```python
+import binascii, json
+
+def encode(fields):
+    body = json.dumps(fields, separators=(',', ':')).encode('ascii')
+    return b'%s*%04X\n' % (body, binascii.crc_hqx(body, 0xFFFF))
+```
+
 ## Debugging
 
 When first connecting you will see a message reporting what fields were successfully received. If any of the mandatory fields are missing SITL will stop, however it will run without the optional fields. This message can be used to double check SITL is receiving everything being sent by the physics backend.

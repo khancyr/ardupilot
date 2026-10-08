@@ -23,6 +23,7 @@
 #include "SIM_JSON.h"
 
 #include <AP_JSON/AP_JSON.h>
+#include <AP_Math/crc.h>
 
 #include <stdio.h>
 #include <arpa/inet.h>
@@ -160,6 +161,76 @@ static bool json_numbers(const AP_JSON::value &v, double *out, uint8_t count)
     return true;
 }
 
+/*
+  check and strip an optional "*XXXX" suffix after the JSON object,
+  where XXXX is the CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) of all
+  bytes before the '*', in hex. This is the same as Python's
+  binascii.crc_hqx(data, 0xFFFF). Trailing whitespace is allowed.
+
+  Returns false if a suffix is present and the CRC does not match. On
+  success len is reduced to exclude the suffix
+ */
+bool JSON::check_crc_suffix(const char *json, size_t &len)
+{
+    size_t end = len;
+    while (end > 0 && (json[end-1] == ' ' || json[end-1] == '\t' || json[end-1] == '\r')) {
+        end--;
+    }
+    if (end < 5 || json[end-5] != '*') {
+        // no suffix, accepted as is
+        return true;
+    }
+    uint16_t sent = 0;
+    for (uint8_t i=0; i<4; i++) {
+        const char c = json[end-4+i];
+        uint8_t nibble;
+        if (c >= '0' && c <= '9') {
+            nibble = c - '0';
+        } else if (c >= 'a' && c <= 'f') {
+            nibble = c - 'a' + 10;
+        } else if (c >= 'A' && c <= 'F') {
+            nibble = c - 'A' + 10;
+        } else {
+            // not a CRC suffix; let the JSON parser report the problem
+            return true;
+        }
+        sent = (sent << 4) | nibble;
+    }
+    len = end - 5;
+    const uint16_t crc = crc16_ccitt((const uint8_t *)json, len, 0xFFFF);
+    if (crc != sent) {
+        crc_error_count++;
+        if (report_parse_error()) {
+            printf("JSON: sensor packet CRC mismatch (got %04X, expected %04X), %u errors\n",
+                   unsigned(sent), unsigned(crc), unsigned(crc_error_count));
+        }
+        return false;
+    }
+    return true;
+}
+
+/*
+  hold the last value of slow changing optional fields for FIELD_HOLD_S
+  of physics time, so a physics backend can send them at a lower rate
+  than the main state. Returns the bitmask of fields to use
+ */
+uint64_t JSON::hold_fields(uint64_t received_bitmask)
+{
+    uint64_t fields = received_bitmask;
+    for (uint8_t i=0; i<ARRAY_SIZE(keytable); i++) {
+        const uint64_t bit = 1ULL << i;
+        if (received_bitmask & bit) {
+            field_received_s[i] = state.timestamp_s;
+        } else if ((HOLDABLE_FIELDS & bit) &&
+                   (last_received_bitmask & bit) &&
+                   state.timestamp_s >= field_received_s[i] &&  // not after a physics reset
+                   state.timestamp_s - field_received_s[i] <= FIELD_HOLD_S) {
+            fields |= bit;
+        }
+    }
+    return fields;
+}
+
 // rate limit reports of bad sensor packets to 1Hz
 bool JSON::report_parse_error()
 {
@@ -191,8 +262,13 @@ uint64_t JSON::parse_sensors(const char *json)
     }
 #endif
 
+    size_t len = strlen(json);
+    if (!check_crc_suffix(json, len)) {
+        return 0;
+    }
+
     AP_JSON::value root;
-    const std::string err = AP_JSON::parse(root, json, strlen(json));
+    const std::string err = AP_JSON::parse(root, json, len);
     if (!err.empty() || !root.is<AP_JSON::value::object>()) {
         if (report_parse_error()) {
             printf("JSON: rejected sensor packet: %s\n", err.empty() ? "not a JSON object" : err.c_str());
@@ -208,9 +284,12 @@ uint64_t JSON::parse_sensors(const char *json)
         struct keytable &key = keytable[i];
 
         // keys with an empty section live in the root object; get()
-        // returns null if the section is not an object or the key is absent
+        // returns null if the section is not an object or the key is
+        // absent. If the full name is absent try the short alias, which
+        // always lives in the root object
         const AP_JSON::value &section = key.section[0] ? root.get(key.section) : root;
-        const AP_JSON::value &v = section.get(key.key);
+        const AP_JSON::value &full = section.get(key.key);
+        const AP_JSON::value &v = (full.is<AP_JSON::null>() && key.alias != nullptr) ? root.get(key.alias) : full;
         if (v.is<AP_JSON::null>()) {
             if (key.required) {
                 if (report_parse_error()) {
@@ -342,11 +421,12 @@ void JSON::recv_fdm(const struct sitl_input &input)
         return;
     }
 
-    const uint64_t received_bitmask = parse_sensors((const char *)(p1+1));
+    uint64_t received_bitmask = parse_sensors((const char *)(p1+1));
     if (received_bitmask == 0) {
         // invalid, or missing mandatory fields; parse_sensors() reports why
         return;
     }
+    received_bitmask = hold_fields(received_bitmask);
 
     // Must get either attitude or quaternion fields
     if ((received_bitmask & (EULER_ATT | QUAT_ATT)) == 0) {
