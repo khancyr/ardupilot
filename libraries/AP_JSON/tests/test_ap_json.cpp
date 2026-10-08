@@ -3,6 +3,7 @@
 #include <AP_HAL/AP_HAL.h>
 
 #include <string.h>
+#include <type_traits>
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
@@ -134,5 +135,9 @@ TEST(AP_JSON, LookupsOnWrongTypeAreSafe)
     EXPECT_DOUBLE_EQ(2.0, v.get("obj").get("k").get<double>());
     EXPECT_TRUE(v.get("missing").is<AP_JSON::null>());
 }
+
+// a growing array must move its values rather than deep copy them
+static_assert(std::is_nothrow_move_constructible<AP_JSON::value>::value, "value move must be noexcept");
+static_assert(std::is_nothrow_move_assignable<AP_JSON::value>::value, "value move must be noexcept");
 
 AP_GTEST_MAIN()

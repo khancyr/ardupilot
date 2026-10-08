@@ -55,9 +55,11 @@ public:
         ~value();
         value(const value &x);
         value &operator=(const value &x);
-        value(value &&x);
-        value &operator=(value &&x);
-        void swap(value &x);
+        // noexcept so a growing array moves its values instead of
+        // deep copying them
+        value(value &&x) noexcept;
+        value &operator=(value &&x) noexcept;
+        void swap(value &x) noexcept;
         template <typename T> bool is() const;
         template <typename T> const T &get() const;
         template <typename T> T &get();

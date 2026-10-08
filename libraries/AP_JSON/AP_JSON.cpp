@@ -246,17 +246,17 @@ value &AP_JSON::value::operator=(const value &x)
     return *this;
 }
 
-AP_JSON::value::value(value &&x) : type_(null_type), u_()
+AP_JSON::value::value(value &&x) noexcept : type_(null_type), u_()
 {
     swap(x);
 }
-value &AP_JSON::value::operator=(value &&x)
+value &AP_JSON::value::operator=(value &&x) noexcept
 {
     swap(x);
     return *this;
 }
 
-void AP_JSON::value::swap(value &x)
+void AP_JSON::value::swap(value &x) noexcept
 {
     std::swap(type_, x.type_);
     std::swap(u_, x.u_);
