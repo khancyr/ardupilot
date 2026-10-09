@@ -1,0 +1,30 @@
+name: Diagnose Docker Hub
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Docker Hub token endpoint
+        run: |
+          curl -sS -o /tmp/token.json \
+            -w 'HTTP status: %{http_code}\n' \
+            --connect-timeout 10 \
+            --max-time 30 \
+            'https://auth.docker.io/token?service=registry.docker.io&scope=repository:ardupilot/ardupilot-dev-chibios:pull'
+
+      - name: Check Docker Registry
+        run: |
+          curl -sS -o /dev/null \
+            -w 'HTTP status: %{http_code}\n' \
+            --connect-timeout 10 \
+            --max-time 30 \
+            https://registry-1.docker.io/v2/
+
+      - name: Test image pull
+        run: |
+          docker pull ardupilot/ardupilot-dev-chibios:v0.2.0
+
