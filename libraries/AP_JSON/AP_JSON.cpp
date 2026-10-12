@@ -78,6 +78,8 @@ AP_JSON::value *AP_JSON::load_json(const char *filename)
         return nullptr;
     }
     AP::FS().close(fd);
+    // strchr() and strlen() below need the buffer terminated
+    buf[st.st_size] = 0;
 
     char *start = strchr(buf, '{');
     if (!start) {
