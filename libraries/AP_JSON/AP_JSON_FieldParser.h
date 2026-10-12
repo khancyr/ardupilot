@@ -17,9 +17,15 @@
 
   A packet is one JSON object on a single line, optionally followed by
   '*' and four hex digits, the CRC-16/CCITT-FALSE (poly 0x1021, init
-  0xFFFF) of the object's bytes, then '\n'. Whitespace may come before
-  a packet. After an error the parser discards bytes up to the next
-  '\n', so a damaged packet never runs into the following one.
+  0xFFFF) of the object's bytes, then '\n'. A NUL byte ends a line like
+  '\n'. Whitespace may come before a packet. After an error the parser
+  discards bytes up to the next end of line, so a damaged packet never
+  runs into the following one.
+
+  On a transport that delivers whole messages, such as UDP, call
+  end_of_message() after each one: a message boundary then ends a line
+  too, so packets need no '\n' and garbage in one message can not cost
+  a packet in the next.
 
   Values are written as they are parsed, so a packet that turns out to
   be invalid has already changed some of its fields. Point the fields at
@@ -81,6 +87,14 @@ public:
         size_t consumed;
         return feed(&c, 1, consumed);
     }
+
+    /*
+      the transport has delivered the end of a message, e.g. a UDP
+      datagram. A packet whose object is complete ends here, as if '\n'
+      followed, and skipping after an error stops here. A packet still
+      part way through carries on into the next message
+     */
+    Result end_of_message();
 
     // bitmask of the fields present in the last packet, bit i for fields[i]
     uint64_t found() const { return _found; }

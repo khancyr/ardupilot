@@ -218,6 +218,62 @@ TEST(AP_JSON_FieldParser, ResyncAfterErrors)
     EXPECT_EQ("EEP", feed(p, "{\"timestamp\":\n1}\n{\"timestamp\":5}\n"));
 }
 
+TEST(AP_JSON_FieldParser, NulEndsALine)
+{
+    const std::string nul(1, '\0');
+    AP_JSON_FieldParser p(fields, 6);
+    // as sent by a C sender writing strlen + 1 bytes
+    EXPECT_EQ("P", feed(p, "{\"timestamp\":1}" + nul));
+    EXPECT_TRUE(same(1.0, st.timestamp));
+    EXPECT_EQ("PP", feed(p, "{\"timestamp\":2}\n" + nul + nul + "{\"timestamp\":3}" + nul));
+    // inside a packet it ends the packet like a newline would, and what
+    // is left of the line is an error of its own
+    EXPECT_EQ("EEP", feed(p, "{\"timestamp\":" + nul + "1}\n{\"timestamp\":4}\n"));
+    EXPECT_TRUE(same(4.0, st.timestamp));
+}
+
+TEST(AP_JSON_FieldParser, MessageBoundaries)
+{
+    AP_JSON_FieldParser p(fields, 6);
+    // a message ending after a complete object ends the packet
+    EXPECT_EQ("", feed(p, "{\"timestamp\":1}"));
+    EXPECT_TRUE(p.end_of_message() == R::PACKET);
+    EXPECT_TRUE(same(1.0, st.timestamp));
+
+    // a CRC before the end of the message is still checked
+    const char *body = "{\"timestamp\":2}";
+    const uint16_t crc = crc16_ccitt((const uint8_t *)body, strlen(body), 0xFFFF);
+    char good[40], bad[40];
+    snprintf(good, sizeof(good), "%s*%04X", body, unsigned(crc));
+    snprintf(bad, sizeof(bad), "%s*%04X", body, unsigned(crc ^ 1));
+    EXPECT_EQ("", feed(p, good));
+    EXPECT_TRUE(p.end_of_message() == R::PACKET);
+    EXPECT_TRUE(p.had_crc());
+    EXPECT_EQ("", feed(p, bad));
+    EXPECT_TRUE(p.end_of_message() == R::ERROR);
+
+    // nothing happens at the end of a message after a newline or between packets
+    EXPECT_EQ("P", feed(p, "{\"timestamp\":3}\n"));
+    EXPECT_TRUE(p.end_of_message() == R::NONE);
+    EXPECT_TRUE(p.end_of_message() == R::NONE);
+
+    // a packet part way through carries on into the next message
+    EXPECT_EQ("", feed(p, "{\"timestamp\":"));
+    EXPECT_TRUE(p.end_of_message() == R::NONE);
+    EXPECT_EQ("P", feed(p, "4}\n"));
+    EXPECT_TRUE(same(4.0, st.timestamp));
+
+    // garbage in one message does not cost the packet in the next
+    EXPECT_EQ("E", feed(p, "hello"));
+    EXPECT_TRUE(p.end_of_message() == R::NONE);
+    EXPECT_EQ("P", feed(p, "{\"timestamp\":5}\n"));
+
+    // whereas on a stream the parser skips to the next end of line
+    EXPECT_EQ("E", feed(p, "hello"));
+    EXPECT_EQ("", feed(p, "{\"timestamp\":6}\n"));
+    EXPECT_EQ("P", feed(p, "{\"timestamp\":7}\n"));
+}
+
 TEST(AP_JSON_FieldParser, Crc)
 {
     AP_JSON_FieldParser p(fields, 6);

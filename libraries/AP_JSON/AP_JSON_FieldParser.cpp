@@ -95,6 +95,10 @@ Result AP_JSON_FieldParser::fail(uint8_t c, const char *msg)
 
 __attribute__((always_inline)) inline Result AP_JSON_FieldParser::feed_byte(uint8_t c)
 {
+    if (c == 0) {
+        // C senders may end a packet with the string's terminator
+        c = '\n';
+    }
     switch (_state) {
     case State::IDLE:
         if (c == '\n' || is_ws(c)) {
@@ -837,3 +841,24 @@ Result AP_JSON_FieldParser::feed(const uint8_t *data, size_t len, size_t &consum
     return r;
 }
 
+Result AP_JSON_FieldParser::end_of_message()
+{
+    switch (_state) {
+    case State::AFTER_OBJECT:
+    case State::CRC_END: {
+        // the object is complete: the end of the message ends the line.
+        // Through feed(), so the state machine is not inlined again here
+        const uint8_t newline = '\n';
+        size_t consumed;
+        return feed(&newline, 1, consumed);
+    }
+    case State::RESYNC:
+        // what followed an error is discarded up to here
+        _state = State::IDLE;
+        return Result::NONE;
+    default:
+        // between packets, or part way through one that may continue
+        // in the next message
+        return Result::NONE;
+    }
+}
