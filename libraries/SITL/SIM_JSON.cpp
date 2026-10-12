@@ -163,11 +163,13 @@ uint64_t JSON::hold_fields(uint64_t received_bitmask)
 // rate limit reports of bad sensor packets to 1Hz
 bool JSON::report_parse_error()
 {
-    const uint32_t now_ms = AP_HAL::millis();
-    if (now_ms - last_parse_error_ms < 1000) {
+    // wall clock time, as simulated time stands still while every
+    // packet is rejected
+    const uint64_t now_us = get_wall_time_us();
+    if (now_us - last_parse_error_us < 1000000) {
         return false;
     }
-    last_parse_error_ms = now_ms;
+    last_parse_error_us = now_us;
     return true;
 }
 
@@ -190,43 +192,65 @@ uint64_t JSON::parse_sensors(const uint8_t *data, size_t len)
 #endif
 
     uint64_t received_bitmask = 0;
-    for (size_t i=0; i<len; i++) {
-        switch (parser.feed(data[i])) {
-        case AP_JSON_FieldParser::Result::NONE:
-            break;
-
-        case AP_JSON_FieldParser::Result::PACKET:
-            if ((parser.found() & REQUIRED_FIELDS) != REQUIRED_FIELDS) {
-                rejected_packets++;
-                if (report_parse_error()) {
-                    printf("JSON: sensor packet missing:");
-                    for (uint8_t f=0; f<ARRAY_SIZE(fields); f++) {
-                        if ((REQUIRED_FIELDS & ~parser.found()) & (1ULL << f)) {
-                            printf(" %s", fields[f].path);
-                        }
-                    }
-                    printf("\n");
-                }
-                state_rx = state;
-                break;
-            }
-            // a complete, valid packet: it becomes the current state
-            state = state_rx;
-            received_bitmask = parser.found();
-            break;
-
-        case AP_JSON_FieldParser::Result::ERROR:
-            rejected_packets++;
-            if (report_parse_error()) {
-                printf("JSON: rejected sensor packet: %s, %u rejected\n",
-                       parser.error(), unsigned(rejected_packets));
-            }
-            // undo whatever the bad packet had written
-            state_rx = state;
-            break;
+    size_t offset = 0;
+    while (offset < len) {
+        size_t used;
+        const uint64_t found = handle_parse_result(parser.feed(&data[offset], len - offset, used));
+        if (found != 0) {
+            received_bitmask = found;
         }
+        offset += used;
+    }
+    // a datagram ends a packet whose object is complete, so senders need
+    // not end packets with a newline, and garbage in one datagram can not
+    // cost a packet in the next
+    const uint64_t found = handle_parse_result(parser.end_of_message());
+    if (found != 0) {
+        received_bitmask = found;
     }
     return received_bitmask;
+}
+
+/*
+  act on a result from the parser, returning the fields of the packet
+  that became the current state, or 0
+ */
+uint64_t JSON::handle_parse_result(AP_JSON_FieldParser::Result result)
+{
+    switch (result) {
+    case AP_JSON_FieldParser::Result::NONE:
+        return 0;
+
+    case AP_JSON_FieldParser::Result::PACKET:
+        if ((parser.found() & REQUIRED_FIELDS) != REQUIRED_FIELDS) {
+            rejected_packets++;
+            if (report_parse_error()) {
+                printf("JSON: sensor packet missing:");
+                for (uint8_t f=0; f<ARRAY_SIZE(fields); f++) {
+                    if ((REQUIRED_FIELDS & ~parser.found()) & (1ULL << f)) {
+                        printf(" %s", fields[f].path);
+                    }
+                }
+                printf("\n");
+            }
+            state_rx = state;
+            return 0;
+        }
+        // a complete, valid packet: it becomes the current state
+        state = state_rx;
+        return parser.found();
+
+    case AP_JSON_FieldParser::Result::ERROR:
+        rejected_packets++;
+        if (report_parse_error()) {
+            printf("JSON: rejected sensor packet: %s, %u rejected\n",
+                   parser.error(), unsigned(rejected_packets));
+        }
+        // undo whatever the bad packet had written
+        state_rx = state;
+        return 0;
+    }
+    return 0;
 }
 
 /*
@@ -263,7 +287,16 @@ void JSON::recv_fdm(const struct sitl_input &input)
         }
     }
 
-    // the parser keeps any partial packet for the next datagram
+    // a datagram filling the buffer may have been truncated, and is
+    // larger than any valid packet
+    if (size_t(ret) >= sizeof(recv_buffer)) {
+        rejected_packets++;
+        if (report_parse_error()) {
+            printf("JSON: sensor datagram too large, %u rejected\n", unsigned(rejected_packets));
+        }
+        return;
+    }
+
     uint64_t received_bitmask = parse_sensors(recv_buffer, ret);
     if (received_bitmask == 0) {
         // no complete valid packet yet; parse_sensors() reports bad ones

@@ -80,8 +80,11 @@ private:
     // valid packet in them, or 0 if there was none
     uint64_t parse_sensors(const uint8_t *data, size_t len);
 
-    // one datagram of sensor data
-    uint8_t recv_buffer[AP_JSON_FieldParser::MAX_PACKET_LEN];
+    uint64_t handle_parse_result(AP_JSON_FieldParser::Result result);
+
+    // one datagram of sensor data. The headroom over the largest packet
+    // lets a datagram that is too large be told from one that fits
+    uint8_t recv_buffer[AP_JSON_FieldParser::MAX_PACKET_LEN + 64];
 
     struct SensorState {
         double timestamp_s;
@@ -223,7 +226,7 @@ private:
     uint32_t rejected_packets;
 
     // rate limits reports of rejected sensor packets
-    uint32_t last_parse_error_ms;
+    uint64_t last_parse_error_us;
     bool report_parse_error();
 
 #if SITL_JSON_DEBUG
