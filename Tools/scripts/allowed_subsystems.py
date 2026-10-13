@@ -116,6 +116,10 @@ class AllowedSubsystems(object):
         'tests': ['tests', 'Tools'],
         '.github': ['.github', 'ci'],
         '.vscode': ['.vscode'],
+        # AI agent skills (see .agents/README.md); .claude/skills only holds
+        # symlinks into .agents/skills
+        '.agents': ['Tools'],
+        '.claude': ['Tools'],
     }
 
     # Files that live in the repository root -> ordered candidate subsystems.
@@ -143,6 +147,7 @@ class AllowedSubsystems(object):
         '.gitmodules': ['modules', 'Tools'],
         '.pre-commit-config.yaml': ['ci', '.github', 'Tools'],
         'AGENTS.md': ['Tools'],
+        'CLAUDE.md': ['Tools'],
         'README.md': ['Tools'],
         'BUILD.md': ['Tools'],
         'CODE_OF_CONDUCT.md': ['Tools'],
