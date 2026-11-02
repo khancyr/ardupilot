@@ -370,8 +370,14 @@ void AP_Scheduler::loop()
           for testing low CPU conditions we can add an optional delay in SITL
         */
         auto *sitl = AP::sitl();
-        uint32_t loop_delay_us = sitl? sitl->loop_delay.get() : 1000U;
-        hal.scheduler->delay_microseconds(loop_delay_us);
+        const int32_t loop_delay = sitl? sitl->loop_delay.get() : 1000;
+        // delay_microseconds() takes 16 bits, so delay in chunks
+        uint32_t loop_delay_us = MAX(loop_delay, 0);
+        while (loop_delay_us > 0) {
+            const uint16_t chunk_us = MIN(loop_delay_us, uint32_t(UINT16_MAX));
+            hal.scheduler->delay_microseconds(chunk_us);
+            loop_delay_us -= chunk_us;
+        }
     }
 #endif
 
