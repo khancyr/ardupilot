@@ -135,6 +135,11 @@ void CRRCSim::recv_fdm(const struct sitl_input &input)
 
     // auto-adjust to crrcsim frame rate
     double deltat = pkt.timestamp - last_timestamp;
+    if (deltat < 0) {
+        // CRRCSim was reset: don't move time back, continue from its
+        // new time
+        deltat = 0;
+    }
     time_now_us += deltat * 1.0e6;
 
     if (deltat < 0.01 && deltat > 0) {
