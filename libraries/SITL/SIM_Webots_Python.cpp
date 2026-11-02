@@ -91,9 +91,17 @@ void WebotsPython::recv_fdm(const struct sitl_input &input)
             last_timestamp = 0;
         }
     }
+    // time sync is off for this backend, so nothing else refreshes the
+    // wall time the reset check above compares against
+    last_wall_time_us = get_wall_time_us();
 
     const double deltat = pkt.timestamp - last_timestamp;  // in seconds
     if (deltat < 0) {  // don't use old packet
+        if (deltat < -1.0) {
+            // too old to be a reordered packet: Webots was reset, so
+            // continue from its new time
+            last_timestamp = pkt.timestamp;
+        }
         time_now_us += 1;
         return;
     }

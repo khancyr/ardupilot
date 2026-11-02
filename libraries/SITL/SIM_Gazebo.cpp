@@ -94,6 +94,11 @@ void Gazebo::recv_fdm(const struct sitl_input &input)
 
     const double deltat = pkt.timestamp - last_timestamp;  // in seconds
     if (deltat < 0) {  // don't use old packet
+        if (deltat < -1.0) {
+            // too old to be a reordered packet: Gazebo was reset, so
+            // continue from its new time
+            last_timestamp = pkt.timestamp;
+        }
         time_now_us += 1;
         return;
     }
