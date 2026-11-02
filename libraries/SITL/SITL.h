@@ -111,6 +111,9 @@ struct sitl_fdm {
 // number of rc output channels
 #define SITL_NUM_CHANNELS 32
 
+// lowest allowed SIM_RATE_HZ
+#define SIM_RATE_HZ_MIN 50
+
 class SIM {
 public:
 

@@ -284,6 +284,11 @@ void Aircraft::setup_frame_time(float new_rate, float new_speedup)
 /* adjust frame_time calculation */
 void Aircraft::adjust_frame_time(float new_rate)
 {
+    // a rate of zero or below, such as SIM_RATE_HZ set to 0, or an
+    // infinite one would give an undefined frame time
+    if (!is_positive(new_rate) || isinf(new_rate)) {
+        return;
+    }
     frame_time_us = uint64_t(1.0e6f/new_rate);
     rate_hz = new_rate;
 }
@@ -482,6 +487,12 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     // in the first call here, if a speedup option is specified, overwrite it
     if (is_equal(last_speedup, -1.0f) && !is_equal(get_speedup(), 1.0f)) {
         sitl->speedup.set(get_speedup());
+    }
+
+    // SIM_RATE_HZ of 0 or less would give an undefined frame time
+    if (sitl->loop_rate_hz < SIM_RATE_HZ_MIN) {
+        sitl->loop_rate_hz.set_and_notify(SIM_RATE_HZ_MIN);
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "SIM_RATE_HZ raised to %d", SIM_RATE_HZ_MIN);
     }
     
     if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {

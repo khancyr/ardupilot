@@ -475,7 +475,7 @@ const AP_Param::GroupInfo SIM::var_info2[] = {
     AP_GROUPINFO("OPOS_HDG",    54, SIM,  opos.hdg, 353.0f),
     // @Param: LOOP_DELAY
     // @DisplayName: Extra delay per main loop
-    // @Description: Extra time delay per main loop
+    // @Description: Extra time delay per main loop. Time only moves in whole physics steps (see SIM_RATE_HZ), so the delay is rounded up to whole steps
     // @Units: us
     AP_GROUPINFO("LOOP_DELAY",  55, SIM,  loop_delay, 0),
 
@@ -549,8 +549,9 @@ const AP_Param::GroupInfo SIM::var_info3[] = {
 
     // @Param: RATE_HZ
     // @DisplayName: Loop rate
-    // @Description: SITL Loop rate
+    // @Description: SITL physics rate. The main loop can only wake on a physics step, so keep this a whole multiple of SCHED_LOOP_RATE
     // @Units: Hz
+    // @Range: 50 10000
     AP_GROUPINFO("RATE_HZ",  22, SIM,  loop_rate_hz, SIM_RATE_HZ_DEFAULT),
 
     // @Param: IMU_COUNT
