@@ -96,32 +96,39 @@ bool BinarySemaphore::wait(uint32_t timeout_us)
             Scheduler::from(hal.scheduler)->semaphore_wait_hack_required()) {
             /*
               when in the main thread we need to do a busy wait to ensure
-              the clock advances
+              the clock advances.  Check pending on every pass, as a
+              signal can arrive at any point, and release the mutex
+              while time moves on so that signalling threads get in
             */
-            uint64_t end_us = AP_HAL::micros64() + timeout_us;
-            struct timespec ts {};
-            do {
-                if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) == 0) {
-                    pending = false;
-                    return true;
+            const uint64_t end_us = AP_HAL::micros64() + timeout_us;
+            while (!pending) {
+                if (AP_HAL::micros64() >= end_us) {
+                    return false;
                 }
+                mtx.give();
                 hal.scheduler->delay_microseconds(10);
-            } while (AP_HAL::micros64() < end_us);
-            return false;
-        }
-
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
-            return false;
-        }
-        ts.tv_sec += timeout_us/1000000UL;
-        ts.tv_nsec += (timeout_us % 1000000U) * 1000UL;
-        if (ts.tv_nsec >= 1000000000L) {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000L;
-        }
-        if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) != 0) {
-            return false;
+                mtx.take_blocking();
+            }
+        } else {
+            struct timespec ts;
+            if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+                return false;
+            }
+            ts.tv_sec += timeout_us/1000000UL;
+            ts.tv_nsec += (timeout_us % 1000000U) * 1000UL;
+            if (ts.tv_nsec >= 1000000000L) {
+                ts.tv_sec++;
+                ts.tv_nsec -= 1000000000L;
+            }
+            // loop as pthread_cond_timedwait() can wake spuriously
+            while (!pending) {
+                if (pthread_cond_timedwait(&cond, &mtx._lock, &ts) != 0) {
+                    break;
+                }
+            }
+            if (!pending) {
+                return false;
+            }
         }
     }
     pending = false;
@@ -131,7 +138,8 @@ bool BinarySemaphore::wait(uint32_t timeout_us)
 bool BinarySemaphore::wait_blocking(void)
 {
     WITH_SEMAPHORE(mtx);
-    if (!pending) {
+    // loop as pthread_cond_wait() can wake spuriously
+    while (!pending) {
         if (pthread_cond_wait(&cond, &mtx._lock) != 0) {
             return false;
         }
