@@ -5,6 +5,7 @@
 #include "AP_HAL_SITL_Namespace.h"
 #include <sys/time.h>
 #include <pthread.h>
+#include <atomic>
 
 #define SITL_SCHEDULER_MAX_TIMER_PROCS 8
 
@@ -50,7 +51,8 @@ public:
     uint64_t stopped_clock_usec() const { return _stopped_clock_usec; }
 
     static void _run_io_procs();
-    static bool _should_exit;
+    // set from the SIGTERM handler, read by the main loop and the exit watchdog
+    static std::atomic<bool> _should_exit;
 
     /*
       create a new thread

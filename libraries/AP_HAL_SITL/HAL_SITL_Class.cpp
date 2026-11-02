@@ -5,6 +5,9 @@
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <atomic>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -183,6 +186,39 @@ void HAL_SITL::exit_signal_handler(int signum)
     HALSITL::Scheduler::_should_exit = true;
 }
 
+// set once the main loop has seen _should_exit and started exiting
+static std::atomic<bool> main_loop_exiting;
+
+#if !HAL_SITL_WASM_ENABLED
+/*
+  the exit signals only set _should_exit, which the main loop checks
+  between iterations.  If the main thread is stuck it never sees the
+  flag and the process outlives SIGTERM, so watch for the flag here
+  and leave anyway if the main loop has not started exiting in time
+ */
+static void *exit_watchdog(void *)
+{
+    while (!HALSITL::Scheduler::_should_exit) {
+        usleep(100000);
+    }
+    unsigned left_s = 5;
+    while (left_s > 0) {
+        // sleep() returns early if a signal interrupts it
+        left_s = sleep(left_s);
+    }
+    if (main_loop_exiting) {
+        // exit() is running, e.g. writing coverage data: let it finish
+        return nullptr;
+    }
+    // write() rather than fprintf(): a stuck main thread may hold the stdio lock
+    static const char msg[] = "Main loop did not exit within 5s of exit signal, exiting now\n";
+    UNUSED_RESULT(write(STDERR_FILENO, msg, sizeof(msg)-1));
+    // _exit() skips the atexit() handler that removes our Unix socket files
+    SocketAPM_native::cleanup_unix_paths();
+    _exit(1);
+}
+#endif  // !HAL_SITL_WASM_ENABLED
+
 void HAL_SITL::setup_signal_handlers() const
 {
     struct sigaction sa = { };
@@ -196,6 +232,12 @@ void HAL_SITL::setup_signal_handlers() const
     sigaction(SIGQUIT, &sa, NULL);
 #endif
 
+#if !HAL_SITL_WASM_ENABLED
+    pthread_t thread;
+    if (pthread_create(&thread, nullptr, exit_watchdog, nullptr) == 0) {
+        pthread_detach(thread);
+    }
+#endif
 }
 
 /*
@@ -291,6 +333,7 @@ void HAL_SITL::run(int argc, char * const argv[], Callbacks* callbacks) const
 
     while (true) {
         if (HALSITL::Scheduler::_should_exit) {
+            main_loop_exiting = true;
             ::fprintf(stderr, "Exitting\n");
             exit(0);
         }
