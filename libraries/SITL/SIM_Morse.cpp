@@ -470,8 +470,10 @@ void Morse::update(const struct sitl_input &input)
 
     double dt_s = state.timestamp - last_state.timestamp;
     if (dt_s < 0 || dt_s > 1) {
-        // cope with restarting while connected
-        initial_time_s = time_now_us * 1.0e-6f;
+        // cope with restarting while connected: restart our time base
+        // as on first connection; SITL_State keeps the vehicle's clock
+        // continuous when this time goes back
+        initial_time_s = 0;
         last_time_s = state.timestamp;
         return;
     }

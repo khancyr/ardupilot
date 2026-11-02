@@ -569,8 +569,10 @@ void FlightAxis::update(const struct sitl_input &input)
 
     double dt_seconds = state.m_currentPhysicsTime_SEC - last_time_s;
     if (dt_seconds < 0) {
-        // cope with restarting RealFlight while connected
-        initial_time_s = time_now_us * 1.0e-6f;
+        // cope with restarting RealFlight while connected: restart
+        // our time base as on first connection; SITL_State keeps the
+        // vehicle's clock continuous when this time goes back
+        initial_time_s = 0;
         last_time_s = state.m_currentPhysicsTime_SEC;
         position_offset.zero();
         return;
