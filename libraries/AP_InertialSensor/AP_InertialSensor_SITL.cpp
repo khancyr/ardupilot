@@ -132,10 +132,13 @@ void AP_InertialSensor_SITL::generate_accel()
         const Vector3f &vibe_freq = sitl->vibe_freq;
 
         if (!vibe_freq.is_zero() && motors_on) {
-            accel.x += sinf(accel_time * 2 * M_PI * vibe_freq.x) * calculate_noise(accel_noise, noise_variation);
-            accel.y += sinf(accel_time * 2 * M_PI * vibe_freq.y) * calculate_noise(accel_noise, noise_variation);
-            accel.z += sinf(accel_time * 2 * M_PI * vibe_freq.z) * calculate_noise(accel_noise, noise_variation);
-            accel_time += 1.0f / (accel_sample_hz * nsamples);
+            accel.x += sinf(accel_vibe_phase.x) * calculate_noise(accel_noise, noise_variation);
+            accel.y += sinf(accel_vibe_phase.y) * calculate_noise(accel_noise, noise_variation);
+            accel.z += sinf(accel_vibe_phase.z) * calculate_noise(accel_noise, noise_variation);
+            const float phase_scale = 2 * M_PI / (accel_sample_hz * nsamples);
+            accel_vibe_phase.x = wrap_2PI(accel_vibe_phase.x + vibe_freq.x * phase_scale);
+            accel_vibe_phase.y = wrap_2PI(accel_vibe_phase.y + vibe_freq.y * phase_scale);
+            accel_vibe_phase.z = wrap_2PI(accel_vibe_phase.z + vibe_freq.z * phase_scale);
         }
 
         // VIB_MOT_MAX is a rpm-scaled vibration applied to each axis
@@ -250,10 +253,13 @@ void AP_InertialSensor_SITL::generate_gyro()
         }
 
         if (!vibe_freq.is_zero() && motors_on) {
-            p += sinf(gyro_time * 2 * M_PI * vibe_freq.x) * calculate_noise(gyro_noise, noise_variation);
-            q += sinf(gyro_time * 2 * M_PI * vibe_freq.y) * calculate_noise(gyro_noise, noise_variation);
-            r += sinf(gyro_time * 2 * M_PI * vibe_freq.z) * calculate_noise(gyro_noise, noise_variation);
-            gyro_time += 1.0f / (gyro_sample_hz * nsamples);
+            p += sinf(gyro_vibe_phase.x) * calculate_noise(gyro_noise, noise_variation);
+            q += sinf(gyro_vibe_phase.y) * calculate_noise(gyro_noise, noise_variation);
+            r += sinf(gyro_vibe_phase.z) * calculate_noise(gyro_noise, noise_variation);
+            const float phase_scale = 2 * M_PI / (gyro_sample_hz * nsamples);
+            gyro_vibe_phase.x = wrap_2PI(gyro_vibe_phase.x + vibe_freq.x * phase_scale);
+            gyro_vibe_phase.y = wrap_2PI(gyro_vibe_phase.y + vibe_freq.y * phase_scale);
+            gyro_vibe_phase.z = wrap_2PI(gyro_vibe_phase.z + vibe_freq.z * phase_scale);
         }
 
         // VIB_MOT_MAX is a rpm-scaled vibration applied to each axis

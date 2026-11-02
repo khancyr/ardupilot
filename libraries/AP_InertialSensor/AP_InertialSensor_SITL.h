@@ -49,8 +49,10 @@ private:
     uint64_t next_gyro_sample;
     uint64_t next_accel_sample;
     uint64_t flightaxis_imu_frame_num;
-    float gyro_time;
-    float accel_time;
+    // SIM_VIB_FREQ phase per axis, radians, kept wrapped so that
+    // float precision does not run out on long runs
+    Vector3f gyro_vibe_phase;
+    Vector3f accel_vibe_phase;
     float gyro_motor_phase[32];
     float accel_motor_phase[32];
     uint32_t temp_start_ms;
