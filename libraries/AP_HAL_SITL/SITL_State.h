@@ -84,11 +84,17 @@ private:
 
     void wait_clock(uint64_t wait_time_usec);
 
+    // simulated time to give the scheduler for a simulator timestamp,
+    // never zero and never going backwards
+    uint64_t monotonic_fdm_time(uint64_t sim_time_us);
+
     // internal state
     uint8_t _instance;
     uint16_t _base_port;
     pid_t _parent_pid;
     uint32_t _update_count;
+    uint64_t _fdm_time_offset_us;
+    uint64_t _last_fdm_time_us;
 
     Scheduler *_scheduler;
 

@@ -263,6 +263,8 @@ void SITL_State::_fdm_input_local(void)
 
     // get FDM output from the model
     sitl_model->fill_fdm(_sitl->state);
+    // everything downstream, including peripherals, sees continuous time
+    _sitl->state.timestamp_us = monotonic_fdm_time(_sitl->state.timestamp_us);
 
 #if HAL_NUM_CAN_IFACES
     if (CANIface::num_interfaces() > 0) {
@@ -287,6 +289,33 @@ void SITL_State::_fdm_input_local(void)
     set_height_agl();
 
     _update_count++;
+}
+
+/*
+  map a simulator timestamp onto the scheduler's clock.  The clock
+  must never be zero, as zero makes AP_HAL::micros64() fall back to
+  the wall clock, and must never go backwards, as every "now - last"
+  interval in the vehicle code is unsigned.  An external simulator
+  that is reset or restarted can give either, so when its time goes
+  back we add an offset that keeps our clock continuous, in the same
+  way SITL peripherals cope with the vehicle rebooting
+ */
+uint64_t SITL_State::monotonic_fdm_time(uint64_t sim_time_us)
+{
+    const uint64_t min_us = MAX(_last_fdm_time_us, uint64_t(1U));
+    uint64_t time_us = sim_time_us + _fdm_time_offset_us;
+    // compare as a signed difference so that a backend whose time
+    // wrapped below zero is seen as going back, not a huge jump forward
+    if (int64_t(time_us - min_us) < 0) {
+        if (_last_fdm_time_us != 0) {
+            ::printf("SITL: simulator time went back %.3fs, keeping the clock continuous\n",
+                     (min_us - time_us) * 1.0e-6);
+        }
+        _fdm_time_offset_us += min_us - time_us;
+        time_us = min_us;
+    }
+    _last_fdm_time_us = time_us;
+    return time_us;
 }
 
 /*
