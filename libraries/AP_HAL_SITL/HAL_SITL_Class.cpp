@@ -170,10 +170,27 @@ static bool watchdog_load(uint32_t *data, uint32_t nwords)
 }
 
 /*
+  an exit signal that arrived while we were rebooting would be lost by
+  execv(), as the new image starts with _should_exit clear and the
+  process would carry on running, so exit instead.  Only uses
+  functions safe to call from a signal handler
+ */
+static void exit_if_exit_requested(void)
+{
+    if (HALSITL::Scheduler::_should_exit) {
+        static const char msg[] = "Exit signal received while rebooting, exiting\n";
+        UNUSED_RESULT(write(STDERR_FILENO, msg, sizeof(msg)-1));
+        SocketAPM_native::cleanup_unix_paths();
+        _exit(0);
+    }
+}
+
+/*
   implement watchdoh reset via SIGALRM
  */
 static void sig_alrm(int signum)
 {
+    exit_if_exit_requested();
     static char env[] = "SITL_WATCHDOG_RESET=1";
     putenv(env);
     printf("GOT SIGALRM\n");
@@ -368,6 +385,7 @@ void HAL_SITL::actually_reboot()
     // Emscripten cannot exec; terminate so the host can recreate the Worker.
     abort();
 #else
+    exit_if_exit_requested();
     SocketAPM_native::cleanup_unix_paths();
     execv(new_argv[0], new_argv);
     AP_HAL::panic("PANIC: REBOOT FAILED: %s", strerror(errno));
