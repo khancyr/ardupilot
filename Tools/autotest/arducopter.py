@@ -19695,6 +19695,7 @@ class AutoTestCopter(vehicle_test_suite.TestSuite):
             self.MissionRTLYawBehaviour,
             self.MAV_CMD_MISSION_START_p1_p2,
             self.ScriptingFlipMode,
+            self.ScriptingVehicleReboot,
             self.UTMGlobalPosition,
         ])
         return ret
@@ -22160,6 +22161,33 @@ RTL_ALT_M 111
 
         # Test done
         self.land_and_disarm()
+
+    def ScriptingVehicleReboot(self):
+        '''test rebooting the vehicle from a Lua script'''
+        # the script holds the scheduler semaphore while
+        # AP_Vehicle::reboot() delays, which used to deadlock SITL
+        self.set_parameters({
+            "SCR_ENABLE": 1,
+        })
+        self.install_script_content_context("vehicle-reboot.lua", """
+local function update()
+  if param:get('SCR_USER1') == param:get('STAT_BOOTCNT') then
+    vehicle:reboot(false)
+  end
+  return update, 100
+end
+return update, 1000
+""")
+        self.reboot_sitl()
+        self.wait_ready_to_arm()
+        # stats must have been reset, or the reboot resets them again
+        # and loses the boot count increment
+        if self.get_parameter('STAT_RESET') == 0:
+            raise NotAchievedException("STAT_RESET is zero")
+        old_bootcount = self.get_parameter('STAT_BOOTCNT')
+        # reboots once: the boot count no longer matches afterwards
+        self.set_parameter('SCR_USER1', old_bootcount)
+        self.detect_and_handle_reboot(old_bootcount, timeout=30)
 
     def ScriptingFlyVelocity(self):
         '''test flying a velocity vector using scripting'''
