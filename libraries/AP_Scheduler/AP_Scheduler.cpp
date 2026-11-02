@@ -37,6 +37,7 @@
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
 #include <SITL/SITL.h>
+#include <GCS_MAVLink/GCS.h>
 #endif
 #include <stdio.h>
 
@@ -377,6 +378,21 @@ void AP_Scheduler::loop()
             const uint16_t chunk_us = MIN(loop_delay_us, uint32_t(UINT16_MAX));
             hal.scheduler->delay_microseconds(chunk_us);
             loop_delay_us -= chunk_us;
+        }
+
+        /*
+          the main loop can only wake on a physics step, so a loop
+          period that is not a whole number of steps alternates
+          between two lengths, giving a loop dt far noisier than on
+          hardware
+        */
+        if (sitl != nullptr && sitl->loop_rate_hz != _sitl_rate_checked_hz) {
+            _sitl_rate_checked_hz = sitl->loop_rate_hz;
+            const uint16_t loop_rate_hz = get_loop_rate_hz();
+            if (_sitl_rate_checked_hz > 0 && (_sitl_rate_checked_hz % loop_rate_hz) != 0) {
+                GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "SIM_RATE_HZ %d not a multiple of loop rate %u",
+                              int(_sitl_rate_checked_hz), unsigned(loop_rate_hz));
+            }
         }
     }
 #endif

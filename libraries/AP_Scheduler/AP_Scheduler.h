@@ -274,6 +274,10 @@ private:
     // the loop rate in case we are well over budget
     uint32_t extra_loop_us;
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    // SIM_RATE_HZ value last checked against the loop rate
+    int16_t _sitl_rate_checked_hz;
+#endif
 
     // semaphore that is held while not waiting for ins samples
     HAL_Semaphore _rsem;
