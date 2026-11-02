@@ -321,7 +321,7 @@ void AirSim::recv_fdm(const sitl_input& input)
     dcm.from_euler(state.pose.roll, state.pose.pitch, state.pose.yaw);
 
     if (last_timestamp) {
-        int deltat = state.timestamp - last_timestamp;
+        const int64_t deltat = int64_t(state.timestamp - last_timestamp);
         time_now_us += deltat;
 
         if (deltat > 0 && deltat < 100000) {

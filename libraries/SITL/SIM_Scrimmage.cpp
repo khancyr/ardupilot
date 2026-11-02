@@ -85,9 +85,11 @@ void Scrimmage::recv_fdm(const struct sitl_input &input)
         dt_us = pkt.timestamp_us - prev_timestamp_us;
     time_now_us += dt_us;
 
-    float dt_inv = 1.0e6 / ((float)dt_us);
-    if ( dt_inv > 100) {
-        adjust_frame_time(dt_inv);
+    if (dt_us > 0) {
+        float dt_inv = 1.0e6 / ((float)dt_us);
+        if ( dt_inv > 100) {
+            adjust_frame_time(dt_inv);
+        }
     }
     prev_timestamp_us = pkt.timestamp_us;
 
