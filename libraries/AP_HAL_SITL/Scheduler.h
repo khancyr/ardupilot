@@ -5,6 +5,7 @@
 #include "AP_HAL_SITL_Namespace.h"
 #include <sys/time.h>
 #include <pthread.h>
+#include <atomic>
 
 #define SITL_SCHEDULER_MAX_TIMER_PROCS 8
 
@@ -47,7 +48,7 @@ public:
         _run_io_procs();
     }
 
-    uint64_t stopped_clock_usec() const { return _stopped_clock_usec; }
+    uint64_t stopped_clock_usec() const { return _stopped_clock_usec.load(std::memory_order_relaxed); }
 
     static void _run_io_procs();
     static bool _should_exit;
@@ -86,8 +87,9 @@ private:
     static bool _in_io_proc;
 
     // boolean set by the Semaphore code to indicate it's currently
-    // waiting for a take-timeout to occur.
-    static bool _in_semaphore_take_wait;
+    // waiting for a take-timeout to occur.  Per thread: only the main
+    // thread's own value matters, and other threads must not clear it
+    static thread_local bool _in_semaphore_take_wait;
 
     void stop_clock(uint64_t time_usec) override;
 
@@ -95,7 +97,8 @@ private:
     static void check_thread_stacks(void);
     
     bool _initialized;
-    uint64_t _stopped_clock_usec;
+    // written by the main thread, read by every thread
+    std::atomic<uint64_t> _stopped_clock_usec;
     uint64_t _last_io_run;
     pthread_t _main_ctx;
 

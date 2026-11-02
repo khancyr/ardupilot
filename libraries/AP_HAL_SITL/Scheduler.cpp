@@ -41,7 +41,7 @@ uint8_t Scheduler::_num_io_procs = 0;
 bool Scheduler::_in_io_proc = false;
 bool Scheduler::_should_exit = false;
 
-bool Scheduler::_in_semaphore_take_wait = false;
+thread_local bool Scheduler::_in_semaphore_take_wait = false;
 
 Scheduler::thread_attr *Scheduler::threads;
 HAL_Semaphore Scheduler::_thread_sem;
@@ -300,7 +300,7 @@ void Scheduler::_run_io_procs()
  */
 void Scheduler::stop_clock(uint64_t time_usec)
 {
-    _stopped_clock_usec = time_usec;
+    _stopped_clock_usec.store(time_usec, std::memory_order_relaxed);
     if (_sitlState->_sitl != nullptr && time_usec - _last_io_run > 10000) {
         _last_io_run = time_usec;
         _run_io_procs();
