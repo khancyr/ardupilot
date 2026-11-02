@@ -6,6 +6,7 @@
 #include <AP_HAL/Semaphores.h>
 #include "AP_HAL_SITL_Namespace.h"
 #include <pthread.h>
+#include <atomic>
 
 class HALSITL::Semaphore : public AP_HAL::Semaphore {
 public:
@@ -19,7 +20,8 @@ public:
 
 protected:
     pthread_mutex_t _lock;
-    pthread_t owner;
+    // read by the main thread while another thread holds the lock
+    std::atomic<pthread_t> owner {(pthread_t)-1};
 
     // keep track the recursion level to ensure we only disown the
     // semaphore once we're done with it

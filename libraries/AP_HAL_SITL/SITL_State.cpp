@@ -137,11 +137,19 @@ void SITL_State::wait_clock(uint64_t wait_time_usec)
         // for purposes of sleeps treat low speedups as 1
         speedup = 1.0;
     }
+    // set while this thread waits for the main thread to move the
+    // clock, so that the main thread knows to step time if it needs a
+    // lock this thread holds
+    bool registered_as_waiter = false;
     while (AP_HAL::micros64() < wait_time_usec) {
         if (hal.scheduler->in_main_thread() ||
             Scheduler::from(hal.scheduler)->semaphore_wait_hack_required()) {
             _fdm_input_step();
         } else {
+            if (!registered_as_waiter) {
+                registered_as_waiter = true;
+                Scheduler::clock_wait_begin();
+            }
 #ifdef CYGWIN_BUILD
             if (speedup > 2 && hal.util->get_soft_armed()) {
                 const char *current_thread = Scheduler::from(hal.scheduler)->get_current_thread_name();
@@ -164,6 +172,9 @@ void SITL_State::wait_clock(uint64_t wait_time_usec)
             // of simulated time
             usleep(10);
         }
+    }
+    if (registered_as_waiter) {
+        Scheduler::clock_wait_end();
     }
     // check the outbound TCP queue size.  If it is too long then
     // MAVProxy/pymavlink take too long to process packets and it ends

@@ -41,13 +41,34 @@ void Semaphore::check_owner() const
 
 bool Semaphore::take(uint32_t timeout_ms)
 {
+    auto *sched = Scheduler::from(hal.scheduler);
     if (timeout_ms == HAL_SEMAPHORE_BLOCK_FOREVER) {
-        if (pthread_mutex_lock(&_lock) == 0) {
-            owner = pthread_self();
-            take_count++;
-            return true;
+        if (!sched->in_clock_thread()) {
+            if (pthread_mutex_lock(&_lock) == 0) {
+                owner = pthread_self();
+                take_count++;
+                return true;
+            }
+            return false;
         }
-        return false;
+        /*
+          only the main thread moves simulated time.  If it blocked
+          here while the holder of this semaphore waits for time to
+          pass (a delay, a timed take), neither could ever proceed, so
+          step the clock while the holder is waiting for it.  Otherwise
+          time stays stopped while we wait, as with a plain
+          pthread_mutex_lock()
+         */
+        while (!take_nonblocking()) {
+            if (Scheduler::thread_waiting_for_clock(owner)) {
+                const bool was_waiting = sched->set_in_semaphore_take_wait(true);
+                hal.scheduler->delay_microseconds(200);
+                sched->set_in_semaphore_take_wait(was_waiting);
+            } else {
+                usleep(10);
+            }
+        }
+        return true;
     }
     if (take_nonblocking()) {
         owner = pthread_self();
@@ -55,9 +76,9 @@ bool Semaphore::take(uint32_t timeout_ms)
     }
     uint64_t start = AP_HAL::micros64();
     do {
-        Scheduler::from(hal.scheduler)->set_in_semaphore_take_wait(true);
+        const bool was_waiting = sched->set_in_semaphore_take_wait(true);
         hal.scheduler->delay_microseconds(200);
-        Scheduler::from(hal.scheduler)->set_in_semaphore_take_wait(false);
+        sched->set_in_semaphore_take_wait(was_waiting);
         if (take_nonblocking()) {
             owner = pthread_self();
             return true;

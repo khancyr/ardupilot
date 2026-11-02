@@ -126,6 +126,7 @@ void SITL_State::init(int argc, char * const argv[]) {
 
 void SITL_State::wait_clock(uint64_t wait_time_usec)
 {
+    bool registered_as_waiter = false;
     while (AP_HAL::micros64() < wait_time_usec) {
         if (hal.scheduler->in_main_thread() ||
             Scheduler::from(hal.scheduler)->semaphore_wait_hack_required()) {
@@ -134,8 +135,15 @@ void SITL_State::wait_clock(uint64_t wait_time_usec)
             sim_update();
             set_voltage_current_pins(sitl_model->get_battery_voltage(), sitl_model->get_battery_current());
         } else {
+            if (!registered_as_waiter) {
+                registered_as_waiter = true;
+                Scheduler::clock_wait_begin();
+            }
             usleep(1000);
         }
+    }
+    if (registered_as_waiter) {
+        Scheduler::clock_wait_end();
     }
 }
 

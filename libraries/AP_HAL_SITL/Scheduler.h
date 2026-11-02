@@ -59,7 +59,12 @@ public:
     bool thread_create(AP_HAL::MemberProc, const char *name,
                        uint32_t stack_size, priority_base base, int8_t priority) override;
 
-    void set_in_semaphore_take_wait(bool value) { _in_semaphore_take_wait = value; }
+    // returns the previous value, so that a nested take can restore it
+    bool set_in_semaphore_take_wait(bool value) {
+        const bool ret = _in_semaphore_take_wait;
+        _in_semaphore_take_wait = value;
+        return ret;
+    }
     /*
      * semaphore_wait_hack_required - possibly move time input step
      * forward even if we are currently pretending to be the IO or timer
@@ -67,6 +72,16 @@ public:
      */
     // a couple of helper functions to cope with SITL's time stepping
     bool semaphore_wait_hack_required() const;
+
+    // true on the thread that steps simulated time, whatever it is
+    // currently running (timer and IO procs included)
+    bool in_clock_thread() const { return pthread_self() == _main_ctx; }
+
+    // track the threads blocked in wait_clock() until the main thread
+    // moves simulated time forward
+    static void clock_wait_begin();
+    static void clock_wait_end();
+    static bool thread_waiting_for_clock(pthread_t thread);
 
     // get the name of the current thread, or nullptr if not known
     const char *get_current_thread_name(void) const;

@@ -43,6 +43,11 @@ bool Scheduler::_should_exit = false;
 
 thread_local bool Scheduler::_in_semaphore_take_wait = false;
 
+// threads currently blocked in wait_clock()
+static pthread_mutex_t clock_waiters_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t clock_waiters[32];
+static uint8_t num_clock_waiters;
+
 Scheduler::thread_attr *Scheduler::threads;
 HAL_Semaphore Scheduler::_thread_sem;
 
@@ -124,6 +129,42 @@ bool Scheduler::semaphore_wait_hack_required() const
     }
 
     return _in_semaphore_take_wait;
+}
+
+void Scheduler::clock_wait_begin()
+{
+    pthread_mutex_lock(&clock_waiters_mtx);
+    if (num_clock_waiters < ARRAY_SIZE(clock_waiters)) {
+        clock_waiters[num_clock_waiters++] = pthread_self();
+    }
+    pthread_mutex_unlock(&clock_waiters_mtx);
+}
+
+void Scheduler::clock_wait_end()
+{
+    const pthread_t self = pthread_self();
+    pthread_mutex_lock(&clock_waiters_mtx);
+    for (uint8_t i=0; i<num_clock_waiters; i++) {
+        if (pthread_equal(clock_waiters[i], self)) {
+            clock_waiters[i] = clock_waiters[--num_clock_waiters];
+            break;
+        }
+    }
+    pthread_mutex_unlock(&clock_waiters_mtx);
+}
+
+bool Scheduler::thread_waiting_for_clock(pthread_t thread)
+{
+    bool ret = false;
+    pthread_mutex_lock(&clock_waiters_mtx);
+    for (uint8_t i=0; i<num_clock_waiters; i++) {
+        if (pthread_equal(clock_waiters[i], thread)) {
+            ret = true;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&clock_waiters_mtx);
+    return ret;
 }
 
 void Scheduler::delay_microseconds(uint16_t usec)
