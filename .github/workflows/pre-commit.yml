@@ -11,6 +11,7 @@ concurrency:
 permissions:
   contents: read
 
+
 jobs:
   ci:
     runs-on: ubuntu-slim
