@@ -40,6 +40,8 @@
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_Math/AP_Math.h>
 #include <stdio.h>
+#include <float.h>
+#include <stdint.h>
 
 /*
   load JSON file, returning a value object or nullptr on failure
@@ -572,46 +574,49 @@ template <typename String, typename Iter> bool _parse_codepoint(String &out, inp
     return true;
 }
 
-template <typename String, typename Iter> bool _parse_string(String &out, input<Iter> &in)
+// handle the character following a backslash in a string
+template <typename String, typename Iter> bool _parse_escape(String &out, input<Iter> &in)
+{
+    const int ch = in.getc();
+    switch (ch) {
+#define MAP(sym, val)                                                                                                              \
+  case sym:                                                                                                                        \
+    out.push_back(val);                                                                                                            \
+    return true
+        MAP('"', '\"');
+        MAP('\\', '\\');
+        MAP('/', '/');
+        MAP('b', '\b');
+        MAP('f', '\f');
+        MAP('n', '\n');
+        MAP('r', '\r');
+        MAP('t', '\t');
+#undef MAP
+    case 'u':
+        return _parse_codepoint(out, in);
+    default:
+        return false;
+    }
+}
+
+// copy runs of plain characters in one go
+template <typename String> bool _parse_string(String &out, input<const char *> &in)
 {
     while (1) {
+        const size_t n = in.plain_run();
+        out.append(in.cur(), n);
+        in.skip(n);
         int ch = in.getc();
         if (ch < ' ') {
             in.ungetc();
             return false;
         } else if (ch == '"') {
             return true;
-        } else if (ch == '\\') {
-            if ((ch = in.getc()) == -1) {
-                return false;
-            }
-            switch (ch) {
-#define MAP(sym, val)                                                                                                              \
-  case sym:                                                                                                                        \
-    out.push_back(val);                                                                                                            \
-    break
-                MAP('"', '\"');
-                MAP('\\', '\\');
-                MAP('/', '/');
-                MAP('b', '\b');
-                MAP('f', '\f');
-                MAP('n', '\n');
-                MAP('r', '\r');
-                MAP('t', '\t');
-#undef MAP
-            case 'u':
-                if (!_parse_codepoint(out, in)) {
-                    return false;
-                }
-                break;
-            default:
-                return false;
-            }
-        } else {
-            out.push_back(static_cast<char>(ch));
+        } else if (!_parse_escape(out, in)) {
+            // ch can only be a backslash here
+            return false;
         }
     }
-    return false;
 }
 
 template <typename Context, typename Iter> bool _parse_array(Context &ctx, input<Iter> &in)
@@ -701,6 +706,97 @@ template <typename Iter> size_t _scan_number(input<Iter> &in)
     return n;
 }
 
+#if defined(FLT_EVAL_METHOD) && FLT_EVAL_METHOD == 0
+// exact powers of ten: every 10^n for n <= 22 is an exact double. Built by
+// integer multiplication so the build's single precision constant option
+// can not round them
+static constexpr double pow10_exact(unsigned n)
+{
+    return n == 0 ? 1 : 10 * pow10_exact(n - 1);
+}
+static const double powers_of_ten[] = {
+    pow10_exact(0), pow10_exact(1), pow10_exact(2), pow10_exact(3), pow10_exact(4),
+    pow10_exact(5), pow10_exact(6), pow10_exact(7), pow10_exact(8), pow10_exact(9),
+    pow10_exact(10), pow10_exact(11), pow10_exact(12), pow10_exact(13), pow10_exact(14),
+    pow10_exact(15), pow10_exact(16), pow10_exact(17), pow10_exact(18), pow10_exact(19),
+    pow10_exact(20), pow10_exact(21), pow10_exact(22),
+};
+#endif
+
+/*
+  convert a number already checked against the JSON grammar. Numbers with
+  at most 15 significant digits and a decimal exponent within +-22 are
+  converted with a single multiplication or division of two exact
+  doubles, which IEEE arithmetic rounds correctly, so the result is the
+  same as strtod's (Clinger's fast path). That covers most sensor and
+  configuration values; anything else goes to strtod. The fast path is
+  only used where double arithmetic has no extended precision
+ */
+static double _convert_number(const char *s)
+{
+#if defined(FLT_EVAL_METHOD) && FLT_EVAL_METHOD == 0
+    const char *p = s;
+    const bool negative = (*p == '-');
+    if (negative) {
+        p++;
+    }
+    uint64_t mantissa = 0;
+    int digits = 0;     // significant digits, from the first non-zero one
+    int exp10 = 0;
+    for (; *p >= '0' && *p <= '9'; p++) {
+        if (mantissa != 0 || *p != '0') {
+            if (++digits > 15) {
+                return strtod(s, nullptr);
+            }
+            mantissa = mantissa * 10 + uint64_t(*p - '0');
+        }
+    }
+    if (*p == '.') {
+        for (p++; *p >= '0' && *p <= '9'; p++) {
+            if (mantissa != 0 || *p != '0') {
+                if (++digits > 15) {
+                    return strtod(s, nullptr);
+                }
+                mantissa = mantissa * 10 + uint64_t(*p - '0');
+            }
+            exp10--;
+        }
+    }
+    if (*p == 'e' || *p == 'E') {
+        p++;
+        const bool exp_negative = (*p == '-');
+        if (*p == '+' || *p == '-') {
+            p++;
+        }
+        int e = 0;
+        for (; *p >= '0' && *p <= '9'; p++) {
+            e = e * 10 + (*p - '0');
+            if (e > 10000) {
+                // leading zeros can offset any exponent, let strtod
+                // handle it rather than clamp it
+                return strtod(s, nullptr);
+            }
+        }
+        exp10 += exp_negative ? -e : e;
+    }
+    if (mantissa == 0) {
+        const double zero = 0;
+        return negative ? -zero : zero;
+    }
+    // at most 15 digits, so mantissa < 10^15 < 2^53 is exact as a double
+    double v = double(mantissa);
+    if (exp10 >= 0 && exp10 <= 22) {
+        v *= powers_of_ten[exp10];
+        return negative ? -v : v;
+    }
+    if (exp10 < 0 && exp10 >= -22) {
+        v /= powers_of_ten[-exp10];
+        return negative ? -v : v;
+    }
+#endif
+    return strtod(s, nullptr);
+}
+
 /*
   convert a number _scan_number() has checked. Out of line so its buffer
   is only on the stack while converting, not at every nesting level
@@ -718,7 +814,7 @@ template <typename Context> NOINLINE bool _set_number(Context &ctx, const char *
         long_num.assign(start, len);
         s = long_num.c_str();
     }
-    return ctx.set_number(strtod(s, nullptr));
+    return ctx.set_number(_convert_number(s));
 }
 
 template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter> &in)
