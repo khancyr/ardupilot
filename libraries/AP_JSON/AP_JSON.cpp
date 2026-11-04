@@ -32,9 +32,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma GCC optimize("Os")
-
 #define AP_MATH_ALLOW_DOUBLE_FUNCTIONS 1
+
+#include <AP_HAL/AP_HAL_Boards.h>
+
+#if CONFIG_HAL_BOARD != HAL_BOARD_SITL
+// favour flash size on hardware; SITL builds get normal optimisation as
+// the JSON backend parses every frame
+#pragma GCC optimize("Os")
+#endif
 
 #include "AP_JSON.h"
 #include <AP_Filesystem/AP_Filesystem.h>
