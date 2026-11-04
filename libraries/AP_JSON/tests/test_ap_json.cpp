@@ -1,6 +1,7 @@
 #include <AP_gtest.h>
 #include <AP_JSON/AP_JSON.h>
 #include <AP_HAL/AP_HAL.h>
+#include <AP_Filesystem/AP_Filesystem.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -201,5 +202,43 @@ TEST(AP_JSON, LoadJsonStripsComments)
     EXPECT_DOUBLE_EQ(1.0, v->get("n").get<double>());
     delete v;
 }
+
+TEST(AP_JSON, LoadJsonParsesTheWholeFile)
+{
+    // comments before the value may contain anything
+    AP_JSON::value *v = load_json_text("# a { and a \" in a comment\n{\"n\": 1}\n");
+    ASSERT_NE(nullptr, v);
+    EXPECT_DOUBLE_EQ(1.0, v->get("n").get<double>());
+    delete v;
+
+    // anything else before or after it is an error
+    EXPECT_EQ(nullptr, load_json_text("junk {\"n\": 1}"));
+    EXPECT_EQ(nullptr, load_json_text("{\"n\": 1} junk"));
+    EXPECT_EQ(nullptr, load_json_text("# only a comment\n"));
+}
+
+#if AP_FILESYSTEM_ROMFS_ENABLED && CONFIG_HAL_BOARD == HAL_BOARD_SITL
+// every frame and model file SITL embeds must still load
+TEST(AP_JSON, EmbeddedModelsLoad)
+{
+    auto *d = AP::FS().opendir("@ROMFS/models");
+    ASSERT_NE(nullptr, d);
+    unsigned count = 0;
+    struct dirent *de;
+    while ((de = AP::FS().readdir(d)) != nullptr) {
+        const std::string name = de->d_name;
+        if (name.size() < 5 || name.compare(name.size() - 5, 5, ".json") != 0) {
+            continue;
+        }
+        AP_JSON::value *v = AP_JSON::load_json(("@ROMFS/models/" + name).c_str());
+        EXPECT_NE(nullptr, v) << name;
+        EXPECT_TRUE(v != nullptr && v->is<value::object>()) << name;
+        delete v;
+        count++;
+    }
+    AP::FS().closedir(d);
+    EXPECT_GT(count, 0u);
+}
+#endif
 
 AP_GTEST_MAIN()

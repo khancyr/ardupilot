@@ -69,22 +69,15 @@ AP_JSON::value *AP_JSON::load_json(const char *filename)
         return nullptr;
     }
     AP::FS().close(fd);
-    // strchr() and the parse below need the buffer terminated
+    // the comment removal and the parse below need the buffer terminated
     buf[st.st_size] = 0;
-
-    char *start = strchr(buf, '{');
-    if (!start) {
-        ::printf("Invalid json %s\n", filename);
-        delete[] buf;
-        return nullptr;
-    }
 
     /*
       remove comments, as not allowed by the parser, leaving any # in a
       string alone
      */
     bool in_string = false;
-    for (char *p = start; *p; p++) {
+    for (char *p = buf; *p; p++) {
         if (in_string) {
             if (*p == '\\' && p[1]) {
                 p++;
@@ -108,9 +101,9 @@ AP_JSON::value *AP_JSON::load_json(const char *filename)
         delete[] buf;
         return nullptr;
     }
-    std::string err = AP_JSON::parse(*obj, start);
+    std::string err = AP_JSON::parse(*obj, buf);
     if (!err.empty()) {
-        ::printf("parse failed for json %s\n", filename);
+        ::printf("parse failed for json %s: %s\n", filename, err.c_str());
         delete obj;
         delete[] buf;
         return nullptr;
