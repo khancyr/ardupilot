@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <type_traits>
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
@@ -259,5 +260,9 @@ TEST(AP_JSON, EmbeddedModelsLoad)
     EXPECT_GT(count, 0u);
 }
 #endif
+
+// a growing array must move its values rather than deep copy them
+static_assert(std::is_nothrow_move_constructible<AP_JSON::value>::value, "value move must be noexcept");
+static_assert(std::is_nothrow_move_assignable<AP_JSON::value>::value, "value move must be noexcept");
 
 AP_GTEST_MAIN()
