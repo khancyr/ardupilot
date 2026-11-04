@@ -20,7 +20,7 @@ static bool same_double(double a, double b)
 static bool parses(const char *json)
 {
     value v;
-    return AP_JSON::parse(v, std::string(json)).empty();
+    return AP_JSON::parse(v, json, strlen(json)).empty();
 }
 
 TEST(AP_JSON, ValidDocuments)
@@ -131,6 +131,20 @@ TEST(AP_JSON, UnicodeEscapes)
     EXPECT_FALSE(parses("[\"\\ud83d\\u0041\"]")); // high surrogate not followed by a low one
 }
 
+TEST(AP_JSON, BufferWithoutTerminator)
+{
+    // parse must not read past len
+    const char src[] = "{\"a\":12.5}";
+    const size_t len = strlen(src);
+    char *buf = new char[len];
+    memcpy(buf, src, len);
+    value v;
+    EXPECT_TRUE(AP_JSON::parse(v, buf, len).empty());
+    EXPECT_DOUBLE_EQ(12.5, v.get("a").get<double>());
+    EXPECT_FALSE(AP_JSON::parse(v, buf, len - 1).empty());
+    delete[] buf;
+}
+
 TEST(AP_JSON, LookupsOnWrongTypeAreSafe)
 {
     value v;
@@ -174,14 +188,14 @@ TEST(AP_JSON, FailedLookupsReturnNullAfterAWrite)
     EXPECT_TRUE(v.get("n").get(0).is<AP_JSON::null>());
 }
 
-static AP_JSON::value *load_json_text(const char *text)
+static AP_JSON::value *load_json_text(const std::string &text)
 {
     const char *path = "test_ap_json_load.json";
     FILE *f = fopen(path, "w");
     if (f == nullptr) {
         return nullptr;
     }
-    fputs(text, f);
+    fwrite(text.data(), 1, text.size(), f);
     fclose(f);
     AP_JSON::value *v = AP_JSON::load_json(path);
     remove(path);
@@ -215,6 +229,11 @@ TEST(AP_JSON, LoadJsonParsesTheWholeFile)
     EXPECT_EQ(nullptr, load_json_text("junk {\"n\": 1}"));
     EXPECT_EQ(nullptr, load_json_text("{\"n\": 1} junk"));
     EXPECT_EQ(nullptr, load_json_text("# only a comment\n"));
+}
+
+TEST(AP_JSON, LoadJsonRejectsNulInFile)
+{
+    EXPECT_EQ(nullptr, load_json_text(std::string("{\"a\":1}\0junk", 12)));
 }
 
 #if AP_FILESYSTEM_ROMFS_ENABLED && CONFIG_HAL_BOARD == HAL_BOARD_SITL
