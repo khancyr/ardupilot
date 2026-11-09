@@ -2012,7 +2012,8 @@ AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* m
     }
 
     ScriptedMenu* menu = NEW_NOTHROW ScriptedMenu(menu_name, size, parent_menu);
-    if (menu == nullptr) {
+    if (menu == nullptr || menu->name == nullptr) {
+        delete menu;
         return nullptr;
     }
 
@@ -2030,8 +2031,12 @@ AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* m
 AP_CRSF_Telem::ScriptedMenu::ScriptedMenu(const char* menu_name, uint8_t size, uint8_t parent_menu)
 {
     parent_id = parent_menu;
-    name = (const char*)malloc(MAX_SCRIPTED_MENU_NAME_LEN+1);
-    strncpy((char*)name, menu_name, MAX_SCRIPTED_MENU_NAME_LEN);
+    char *menu_name_copy = (char*)malloc(MAX_SCRIPTED_MENU_NAME_LEN+1);
+    if (menu_name_copy != nullptr) {
+        strncpy(menu_name_copy, menu_name, MAX_SCRIPTED_MENU_NAME_LEN);
+        menu_name_copy[MAX_SCRIPTED_MENU_NAME_LEN] = 0;
+    }
+    name = menu_name_copy;
 //    num_params = size;
     params = (ScriptedParameter*)calloc(size, sizeof(ScriptedParameter));
 }
