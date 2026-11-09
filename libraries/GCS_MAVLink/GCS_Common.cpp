@@ -2092,13 +2092,10 @@ GCS_MAVLINK::update_receive(uint32_t max_time_us)
 
         for (uint8_t i=0; i<ARRAY_SIZE(deferred_message_bucket); i++) {
             GCS_SEND_TEXT(MAV_SEVERITY_INFO,
-                            "B. intvl. (%u): %u %u %u %u %u",
+                            "B. intvl. (%u): bucket %u %ums",
                             chan,
-                            deferred_message_bucket[0].interval_ms,
-                            deferred_message_bucket[1].interval_ms,
-                            deferred_message_bucket[2].interval_ms,
-                            deferred_message_bucket[3].interval_ms,
-                            deferred_message_bucket[4].interval_ms);
+                            i,
+                            deferred_message_bucket[i].interval_ms);
         }
 
         try_send_message_stats.statustext_last_sent_ms = now16_ms;
