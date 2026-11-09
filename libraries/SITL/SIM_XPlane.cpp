@@ -307,16 +307,26 @@ void XPlane::select_data(void)
         uint32_t data[8] {};
     } dsel;
     uint8_t count = 0;
+    uint8_t total = 0;
     for (uint8_t i=0; i<ARRAY_SIZE(required_data); i++) {
         if (seen_mask & (1U<<i)) {
             // got this one
             continue;
         }
         dsel.data[count++] = required_data[i];
+        total++;
+        if (count == ARRAY_SIZE(dsel.data)) {
+            // a DSEL packet holds at most 8 codes, send the rest in another
+            socket_out.send(&dsel, sizeof(dsel));
+            memset(dsel.data, 0, sizeof(dsel.data));
+            count = 0;
+        }
     }
     if (count != 0) {
         socket_out.send(&dsel, sizeof(dsel));
-        printf("Selecting %u data types\n", (unsigned)count);
+    }
+    if (total != 0) {
+        printf("Selecting %u data types\n", (unsigned)total);
     }
 }
 
