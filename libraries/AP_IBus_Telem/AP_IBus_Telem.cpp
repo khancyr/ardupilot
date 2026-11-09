@@ -691,17 +691,24 @@ uint16_t AP_IBus_Telem::get_average_cell_voltage_cV()
         return 0;
     }
 
+    // the array has room for the most cells a monitor supports;
+    // average only the cells present, unused ones are 0 or UINT16_MAX
     const auto &cell_voltages = AP::battery().get_cell_voltages();
-    const uint8_t number_of_cells = ARRAY_SIZE(cell_voltages.cells);
+    uint8_t number_of_cells = 0;
+    uint32_t voltage_sum_mv = 0;
+    for (uint8_t i = 0; i < ARRAY_SIZE(cell_voltages.cells); i++) {
+        const uint16_t cell_mv = cell_voltages.cells[i];
+        if (cell_mv == 0 || cell_mv == UINT16_MAX) {
+            continue;
+        }
+        voltage_sum_mv += cell_mv;
+        number_of_cells++;
+    }
     if (number_of_cells == 0) {
         return 0;
     }
-
-    uint32_t voltage_sum = 0;
-    for (auto i = 0; i < number_of_cells; i++) {
-        voltage_sum += cell_voltages.cells[i] * 0.001;
-    }
-    return voltage_sum / number_of_cells * 100;
+    // millivolts to centivolts
+    return voltage_sum_mv / number_of_cells / 10;
 
 }
 
