@@ -98,6 +98,14 @@ private:
     static const uint8_t BROADCAST_NODE_ID = 1;
     static const uint8_t ESC_NODE_ID_FIRST = 2;
 
+    // true if an ESC with this node id maps to an output and to a bit
+    // of the 32-bit detected mask
+    bool valid_esc_node_id(uint8_t node_id) const {
+        static_assert(ARRAY_SIZE(_output.pwm) <= 32, "detected_bitmask needs more bits");
+        return node_id >= ESC_NODE_ID_FIRST &&
+               node_id < ARRAY_SIZE(_output.pwm) + ESC_NODE_ID_FIRST;
+    }
+
     static const uint8_t ESC_INFO_OBJ_ADDR = 0;
     static const uint8_t SET_PWM_OBJ_ADDR = 1;
     static const uint8_t VOLTAGE_OBJ_ADDR = 2;

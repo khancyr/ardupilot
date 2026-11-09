@@ -108,14 +108,13 @@ void AP_KDECAN_Driver::handle_frame(AP_HAL::CANFrame &frame)
     // check if frame is valid: directed at autopilot, doesn't come from broadcast and ESC was detected before
     switch (id.object_address) {
         case ESC_INFO_OBJ_ADDR:
-            if (frame.dlc == 5 &&
-                (id.source_id < (ARRAY_SIZE(_output.pwm) + ESC_NODE_ID_FIRST)))
+            if (frame.dlc == 5 && valid_esc_node_id(id.source_id))
             {
                 if (__builtin_popcount(_init.detected_bitmask) >= KDECAN_MAX_NUM_ESCS) {
                     // we already have the maximum number of ESCs
                     return;
                 }
-                const uint16_t bitmask = (1UL << (id.source_id - ESC_NODE_ID_FIRST));
+                const uint32_t bitmask = (1UL << (id.source_id - ESC_NODE_ID_FIRST));
 
                 if ((bitmask & _init.detected_bitmask) != bitmask) {
                     _init.detected_bitmask |= bitmask;
@@ -126,7 +125,7 @@ void AP_KDECAN_Driver::handle_frame(AP_HAL::CANFrame &frame)
 
 #if HAL_WITH_ESC_TELEM
         case TELEMETRY_OBJ_ADDR:
-            if (frame.dlc == 8 &&
+            if (frame.dlc == 8 && valid_esc_node_id(id.source_id) &&
                 (1UL << (id.source_id - ESC_NODE_ID_FIRST) & _init.detected_bitmask))
             {
                 const uint8_t idx = id.source_id - ESC_NODE_ID_FIRST;
