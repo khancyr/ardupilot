@@ -10,7 +10,7 @@ AP_Compass_SITL::AP_Compass_SITL(uint8_t _sitl_instance) :
     _sitl(AP::sitl()),
     sitl_instance(_sitl_instance)
 {
-    if (sitl_instance > ARRAY_SIZE(_sitl->mag_devid)) {
+    if (sitl_instance >= ARRAY_SIZE(_sitl->mag_devid)) {
         return;
     }
 
@@ -28,7 +28,9 @@ AP_Compass_SITL::AP_Compass_SITL(uint8_t _sitl_instance) :
                 set_rotation(ROTATION_NONE);
 
         // Scroll through the registered compasses, and set the offsets
-            if (_compass.get_offsets(instance).is_zero()) {
+            // only the first sensors have SIM_MAGn_OFS parameters
+            if (_compass.get_offsets(instance).is_zero() &&
+                sitl_instance < ARRAY_SIZE(_sitl->mag_ofs)) {
                 _compass.set_offsets(instance, _sitl->mag_ofs[sitl_instance]);
             }
 
