@@ -64,10 +64,12 @@ void MsgHandler::add_field(const char *_label, uint8_t _type, uint8_t _offset,
     next_field++;
 }
 
+// copy a fixed-length log field, which is not terminated when full
 static char *get_string_field(char *field, uint8_t fieldlen)
 {
     char *ret = (char *)malloc(fieldlen+1);
     memcpy(ret, field, fieldlen);
+    ret[fieldlen] = '\0';
     return ret;
 }
 
