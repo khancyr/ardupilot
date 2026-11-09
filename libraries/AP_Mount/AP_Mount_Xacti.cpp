@@ -626,7 +626,7 @@ void AP_Mount_Xacti::handle_param_save_response(AP_DroneCAN* ap_dronecan, const 
 const char* AP_Mount_Xacti::get_param_name_str(Param param) const
 {
     // check to avoid reading beyond end of array.  This should never happen
-    if ((uint8_t)param > ARRAY_SIZE(_param_names)) {
+    if ((uint8_t)param >= ARRAY_SIZE(_param_names)) {
         INTERNAL_ERROR(AP_InternalError::error_t::invalid_arg_or_result);
         return "";
     }
