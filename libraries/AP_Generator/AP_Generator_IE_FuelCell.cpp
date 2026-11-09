@@ -111,8 +111,9 @@ bool AP_Generator_IE_FuelCell::decode(char c)
     _term[_term_offset++] = c;
     _checksum += c;
 
-    // We have overrun the expected sentence
-    if (_term_offset >TERM_BUFFER) {
+    // We have overrun the expected sentence; stop while there is still
+    // room for the terminator decode_latest_term() adds
+    if (_term_offset >= TERM_BUFFER) {
         _in_string = false;
     }
 
