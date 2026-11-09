@@ -327,7 +327,8 @@ private:
     class PACKED SN {
     public:
         SN(uint8_t *_sn, uint8_t snlen) {
-            memcpy(sn, _sn, ARRAY_SIZE(sn));
+            memset(sn, 0, sizeof(sn));
+            memcpy(sn, _sn, MIN(snlen, ARRAY_SIZE(sn)));
         }
         uint8_t sn[SERIAL_NUMBER_LENGTH];
     };
