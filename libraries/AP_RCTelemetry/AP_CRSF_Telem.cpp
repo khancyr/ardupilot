@@ -1356,8 +1356,8 @@ void AP_CRSF_Telem::calc_parameter() {
         idx += strnlen(menu->name, namelen);
         _telem.ext.param_entry.payload[idx++] = 0; // null terminator
 
-        // menu entries of parameter ids
-        for (uint8_t i = 0; i < menu->num_params; i++) {
+        // menu entries of parameter ids, leaving room for the terminator
+        for (uint8_t i = 0; i < menu->num_params && idx < ARRAY_SIZE(_telem.ext.param_entry.payload) - 1; i++) {
             _telem.ext.param_entry.payload[idx++] = menu->params[i].id;
         }
         _telem.ext.param_entry.payload[idx] = 0xFF; // terminator
@@ -1923,6 +1923,11 @@ AP_CRSF_Telem::ScriptedParameter* AP_CRSF_Telem::ScriptedMenu::add_parameter(uin
 {
     WITH_SEMAPHORE(AP::crsf_telem()->get_semaphore());
 
+    // parameter ids are menu id + 1 to menu id + MAX_SCRIPTED_MENU_SIZE
+    if (num_params >= MAX_SCRIPTED_MENU_SIZE) {
+        return nullptr;
+    }
+
     ScriptedParameter* new_params = (ScriptedParameter*)mem_realloc(params,
         sizeof(ScriptedParameter) * num_params,
         sizeof(ScriptedParameter) * (num_params+1));
@@ -1995,6 +2000,11 @@ AP_CRSF_Telem::ScriptedMenu::~ScriptedMenu()
 AP_CRSF_Telem::ScriptedMenu* AP_CRSF_Telem::ScriptedMenu::add_menu(const char* menu_name, uint8_t size, uint8_t parent_menu)
 {
     WITH_SEMAPHORE(AP::crsf_telem()->get_semaphore());
+
+    // a submenu takes one of the parent's parameter slots
+    if (parent_menu != 0 && num_params >= MAX_SCRIPTED_MENU_SIZE) {
+        return nullptr;
+    }
 
     // find the menu to create
     ScriptedMenu* tail = this;
