@@ -27,7 +27,11 @@ UARTDesc uart_desc[] = {HAL_ESP32_UART_DEVICES};
 
 void UARTDriver::vprintf(const char *fmt, va_list ap)
 {
-
+    // this port may have no UART on this board
+    if (uart_num >= ARRAY_SIZE(uart_desc)) {
+        AP_HAL::UARTDriver::vprintf(fmt, ap);
+        return;
+    }
     uart_port_t p = uart_desc[uart_num].port;
     if (p == 0) {
         esp_log_writev(ESP_LOG_INFO, "", fmt, ap);
@@ -88,6 +92,9 @@ void UARTDriver::_end()
 
 void UARTDriver::_flush()
 {
+    if (uart_num >= ARRAY_SIZE(uart_desc)) {
+        return;
+    }
     uart_port_t p = uart_desc[uart_num].port;
     uart_flush(p);
 }
