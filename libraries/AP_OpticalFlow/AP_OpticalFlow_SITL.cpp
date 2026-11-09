@@ -102,10 +102,14 @@ void AP_OpticalFlow_SITL::update(void)
     state = optflow_data[next_optflow_index];
 
     if (_sitl->flow_delay != optflow_delay) {
-        // cope with updates to the delay control
-        if (_sitl->flow_delay > 0 &&
-            (uint8_t)(_sitl->flow_delay) > ARRAY_SIZE(optflow_data)) {
-            _sitl->flow_delay.set(ARRAY_SIZE(optflow_data));
+        // cope with updates to the delay control.  The ring buffer
+        // uses entries 0 to optflow_delay, so the delay must be less
+        // than its size, and cannot be negative
+        const int8_t max_delay = ARRAY_SIZE(optflow_data) - 1;
+        if (_sitl->flow_delay < 0) {
+            _sitl->flow_delay.set(0);
+        } else if (_sitl->flow_delay > max_delay) {
+            _sitl->flow_delay.set(max_delay);
         }
         optflow_delay = _sitl->flow_delay;
         for (uint8_t i=0; i<optflow_delay; i++) {
