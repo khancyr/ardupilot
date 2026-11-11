@@ -4,6 +4,7 @@ example vehicles using pyBullet
 '''
 
 import argparse
+import binascii
 import json
 import math
 import os
@@ -24,6 +25,8 @@ parser.add_argument("--vehicle", required=True, choices=['racecar', 'iris'], def
 parser.add_argument("--fps", type=float, default=1200.0, help="physics frame rate")
 parser.add_argument("--stadium", default=False, action='store_true', help="use stadium for world")
 parser.add_argument("--nogui", default=False, action='store_true', help="disable GUI")
+parser.add_argument("--compact", default=False, action='store_true',
+                    help="send compact packets (short keys, rounded values, CRC) as used on slow links")
 args = parser.parse_args()
 
 # --- Constants ---
@@ -229,6 +232,25 @@ for joint_number in range(number_of_joints):
     info = p.getJointInfo(robot_id, joint_number)
     print(" %s : %s" % (info[0], info[1]))
 
+def compact_packet(phys_time, gyro, accel, pos, euler, velo):
+    """
+    same fields with short keys, each value rounded to the precision given
+    in the readme, and a CRC-16 suffix. About 150 bytes instead of 400
+    """
+    def r(values, decimals):
+        return [round(v, decimals) for v in values]
+    fields = {
+        "t": round(phys_time, 6),
+        "g": r(gyro, 4),
+        "a": r(accel, 3),
+        "p": r(pos, 3),
+        "v": r(velo, 3),
+        "e": r(euler, 4),
+    }
+    body = json.dumps(fields, separators=(',', ':')).encode("ascii")
+    return b"%s*%04X\n" % (body, binascii.crc_hqx(body, 0xFFFF))
+
+
 # --- Main loop ---
 while True:
     try:
@@ -275,18 +297,20 @@ while True:
 
     phys_time, gyro, accel, pos, euler, velo = physics_step(pwm)
 
-    json_data = {
-        "timestamp": phys_time,
-        "imu": {
-            "gyro": gyro,
-            "accel_body": accel
-        },
-        "position": pos,
-        "attitude": euler,
-        "velocity": velo
-    }
-
-    sock.sendto((json.dumps(json_data, separators=(',', ':')) + "\n").encode("ascii"), address)
+    if args.compact:
+        sock.sendto(compact_packet(phys_time, gyro, accel, pos, euler, velo), address)
+    else:
+        json_data = {
+            "timestamp": phys_time,
+            "imu": {
+                "gyro": gyro,
+                "accel_body": accel
+            },
+            "position": pos,
+            "attitude": euler,
+            "velocity": velo
+        }
+        sock.sendto((json.dumps(json_data, separators=(',', ':')) + "\n").encode("ascii"), address)
 
     if frame_count % print_frame_count == 0:
         now = time.time()
