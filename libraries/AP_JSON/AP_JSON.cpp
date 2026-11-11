@@ -110,7 +110,7 @@ AP_JSON::value *AP_JSON::load_json(const char *filename)
         delete[] buf;
         return nullptr;
     }
-    std::string err = AP_JSON::parse(*obj, std::string(text, end - text));
+    std::string err = AP_JSON::parse(*obj, text, end - text);
     if (!err.empty()) {
         ::printf("parse failed for json %s: %s\n", filename, err.c_str());
         delete obj;
@@ -408,72 +408,88 @@ template <typename Iter> void copy(const std::string &s, Iter oi)
     std::copy(s.begin(), s.end(), oi);
 }
 
-template <typename Iter> class input
+template <typename Iter> class input;
+
+/*
+  input from a plain character buffer, the only input ArduPilot parses.
+  Each getc() is a bounds check and a pointer increment; the line number
+  is only computed when an error message needs it
+ */
+template <> class input<const char *>
 {
-protected:
-    Iter cur_, end_;
+    const char *const start_;
+    const char *cur_;
+    const char *const end_;
     bool consumed_;
-    int line_;
 
 public:
-    input(const Iter &first, const Iter &last) : cur_(first), end_(last), consumed_(false), line_(1)
+    input(const char *const &first, const char *const &last) : start_(first), cur_(first), end_(last), consumed_(false)
     {
     }
     int getc()
     {
-        if (consumed_) {
-            if (*cur_ == '\n') {
-                ++line_;
-            }
-            ++cur_;
-        }
         if (cur_ == end_) {
             consumed_ = false;
             return -1;
         }
         consumed_ = true;
-        return *cur_ & 0xff;
+        return *cur_++ & 0xff;
     }
     void ungetc()
     {
-        consumed_ = false;
-    }
-    Iter cur() const
-    {
         if (consumed_) {
-            input<Iter> *self = const_cast<input<Iter> *>(this);
-            self->consumed_ = false;
-            ++self->cur_;
+            cur_--;
+            consumed_ = false;
         }
+    }
+    const char *cur() const
+    {
         return cur_;
+    }
+    // length of the run of characters from the current position that
+    // need no processing in a string: not a quote, backslash or control
+    size_t plain_run() const
+    {
+        const char *p = cur_;
+        while (p != end_ && *p != '"' && *p != '\\' && uint8_t(*p) >= 0x20) {
+            p++;
+        }
+        return size_t(p - cur_);
+    }
+    void skip(size_t n)
+    {
+        cur_ += n;
+        consumed_ = false;
     }
     int line() const
     {
-        return line_;
+        int line = 1;
+        for (const char *p = start_; p < cur_; p++) {
+            line += (*p == '\n');
+        }
+        return line;
     }
     void skip_ws()
     {
-        while (1) {
-            int ch = getc();
-            if (!(ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r')) {
-                ungetc();
-                break;
-            }
+        while (cur_ != end_ && (*cur_ == ' ' || *cur_ == '\t' || *cur_ == '\n' || *cur_ == '\r')) {
+            cur_++;
         }
+        consumed_ = false;
     }
     bool expect(const int expected)
     {
         skip_ws();
-        if (getc() != expected) {
-            ungetc();
-            return false;
+        if (cur_ != end_ && (*cur_ & 0xff) == expected) {
+            cur_++;
+            consumed_ = true;
+            return true;
         }
-        return true;
+        return false;
     }
-    bool match(const std::string &pattern)
+    bool match(const char *pattern)
     {
-        for (std::string::const_iterator pi(pattern.begin()); pi != pattern.end(); ++pi) {
-            if (getc() != *pi) {
+        for (; *pattern; pattern++) {
+            if (getc() != *pattern) {
                 ungetc();
                 return false;
             }
@@ -619,7 +635,7 @@ template <typename Context, typename Iter> bool _parse_object(Context &ctx, inpu
         if (!in.expect('"') || !_parse_string(key, in) || !in.expect(':')) {
             return false;
         }
-        if (!ctx.parse_object_item(in, key)) {
+        if (!ctx.parse_object_item(in, std::move(key))) {
             return false;
         }
     } while (in.expect(','));
@@ -627,14 +643,14 @@ template <typename Context, typename Iter> bool _parse_object(Context &ctx, inpu
 }
 
 /*
-  scan a number following the JSON grammar exactly, returning an empty
-  string if it is malformed
+  scan a number following the JSON grammar exactly, returning its
+  length, or 0 if the number is malformed
  */
-template <typename Iter> std::string _parse_number(input<Iter> &in)
+template <typename Iter> size_t _scan_number(input<Iter> &in)
 {
-    std::string num_str;
+    size_t n = 0;
     int ch = in.getc();
-#define PUSH() do { num_str.push_back(static_cast<char>(ch)); ch = in.getc(); } while (0)
+#define PUSH() do { n++; ch = in.getc(); } while (0)
 #define DIGIT() ('0' <= ch && ch <= '9')
     if (ch == '-') {
         PUSH();
@@ -646,12 +662,12 @@ template <typename Iter> std::string _parse_number(input<Iter> &in)
             PUSH();
         }
     } else {
-        return std::string();
+        return 0;
     }
     if (ch == '.') {
         PUSH();
         if (!DIGIT()) {
-            return std::string();
+            return 0;
         }
         while (DIGIT()) {
             PUSH();
@@ -663,7 +679,7 @@ template <typename Iter> std::string _parse_number(input<Iter> &in)
             PUSH();
         }
         if (!DIGIT()) {
-            return std::string();
+            return 0;
         }
         while (DIGIT()) {
             PUSH();
@@ -672,7 +688,27 @@ template <typename Iter> std::string _parse_number(input<Iter> &in)
 #undef PUSH
 #undef DIGIT
     in.ungetc();
-    return num_str;
+    return n;
+}
+
+/*
+  convert a number _scan_number() has checked. Out of line so its buffer
+  is only on the stack while converting, not at every nesting level
+ */
+template <typename Context> NOINLINE bool _set_number(Context &ctx, const char *start, size_t len)
+{
+    // strtod needs a terminated copy, the buffer may not be
+    char num[64];
+    std::string long_num;
+    const char *s = num;
+    if (len < sizeof(num)) {
+        memcpy(num, start, len);
+        num[len] = 0;
+    } else {
+        long_num.assign(start, len);
+        s = long_num.c_str();
+    }
+    return ctx.set_number(strtod(s, nullptr));
 }
 
 template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter> &in)
@@ -700,12 +736,12 @@ template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter>
     default:
         if (('0' <= ch && ch <= '9') || ch == '-') {
             in.ungetc();
-            const std::string num_str(_parse_number(in));
-            if (num_str.empty()) {
+            const char *start = in.cur();
+            const size_t len = _scan_number(in);
+            if (len == 0) {
                 return false;
             }
-            ctx.set_number(strtod(num_str.c_str(), nullptr));
-            return true;
+            return _set_number(ctx, start, len);
         }
         break;
     }
@@ -754,6 +790,7 @@ public:
             return false;
         }
         *out_ = value(array_type, false);
+        out_->get<array>().reserve(4);
         return true;
     }
     template <typename Iter> bool parse_array_item(input<Iter> &in, size_t)
@@ -775,11 +812,11 @@ public:
         *out_ = value(object_type, false);
         return true;
     }
-    template <typename Iter> bool parse_object_item(input<Iter> &in, const std::string &key)
+    template <typename Iter> bool parse_object_item(input<Iter> &in, std::string &&key)
     {
         object &o = out_->get<object>();
         // a repeated key would silently replace the earlier value
-        std::pair<object::iterator, bool> item = o.emplace(key, value());
+        std::pair<object::iterator, bool> item = o.emplace(std::move(key), value());
         if (!item.second) {
             return false;
         }
@@ -817,18 +854,24 @@ template <typename Iter> Iter parse(value &out, const Iter &first, const Iter &l
     return _parse(ctx, first, last, err);
 }
 
-std::string AP_JSON::parse(value &out, const std::string &s)
+std::string AP_JSON::parse(value &out, const char *json, size_t len)
 {
     std::string err;
-    std::string::const_iterator p = ::parse(out, s.begin(), s.end(), &err);
+    const char *end = json + len;
+    const char *p = ::parse(out, json, end, &err);
     if (err.empty()) {
         // only whitespace may follow the value
-        while (p != s.end() && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) {
+        while (p != end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) {
             p++;
         }
-        if (p != s.end()) {
+        if (p != end) {
             err = "trailing characters after JSON value";
         }
     }
     return err;
+}
+
+std::string AP_JSON::parse(value &out, const std::string &s)
+{
+    return parse(out, s.data(), s.size());
 }

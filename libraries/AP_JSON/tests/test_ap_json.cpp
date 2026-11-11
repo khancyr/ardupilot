@@ -22,7 +22,7 @@ static bool same_double(double a, double b)
 static bool parses(const char *json)
 {
     value v;
-    return AP_JSON::parse(v, std::string(json)).empty();
+    return AP_JSON::parse(v, json, strlen(json)).empty();
 }
 
 TEST(AP_JSON, ValidDocuments)
@@ -131,6 +131,20 @@ TEST(AP_JSON, UnicodeEscapes)
     EXPECT_FALSE(parses("[\"\\ud83d\"]"));        // lone high surrogate
     EXPECT_FALSE(parses("[\"\\ude81\"]"));        // lone low surrogate
     EXPECT_FALSE(parses("[\"\\ud83d\\u0041\"]")); // high surrogate not followed by a low one
+}
+
+TEST(AP_JSON, BufferWithoutTerminator)
+{
+    // parse must not read past len
+    const char src[] = "{\"a\":12.5}";
+    const size_t len = strlen(src);
+    char *buf = new char[len];
+    memcpy(buf, src, len);
+    value v;
+    EXPECT_TRUE(AP_JSON::parse(v, buf, len).empty());
+    EXPECT_DOUBLE_EQ(12.5, v.get("a").get<double>());
+    EXPECT_FALSE(AP_JSON::parse(v, buf, len - 1).empty());
+    delete[] buf;
 }
 
 TEST(AP_JSON, LookupsOnWrongTypeAreSafe)
