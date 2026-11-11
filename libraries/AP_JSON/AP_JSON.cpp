@@ -40,6 +40,7 @@
 #include <AP_Filesystem/AP_Filesystem.h>
 #include <AP_Math/AP_Math.h>
 #include <stdio.h>
+#include "AP_JSON_Number.h"
 
 // defined below, used by load_json()
 template <> bool AP_JSON::value::is<AP_JSON::value::object>() const;
@@ -562,46 +563,49 @@ template <typename String, typename Iter> bool _parse_codepoint(String &out, inp
     return true;
 }
 
-template <typename String, typename Iter> bool _parse_string(String &out, input<Iter> &in)
+// handle the character following a backslash in a string
+template <typename String, typename Iter> bool _parse_escape(String &out, input<Iter> &in)
+{
+    const int ch = in.getc();
+    switch (ch) {
+#define MAP(sym, val)                                                                                                              \
+  case sym:                                                                                                                        \
+    out.push_back(val);                                                                                                            \
+    return true
+        MAP('"', '\"');
+        MAP('\\', '\\');
+        MAP('/', '/');
+        MAP('b', '\b');
+        MAP('f', '\f');
+        MAP('n', '\n');
+        MAP('r', '\r');
+        MAP('t', '\t');
+#undef MAP
+    case 'u':
+        return _parse_codepoint(out, in);
+    default:
+        return false;
+    }
+}
+
+// copy runs of plain characters in one go
+template <typename String> bool _parse_string(String &out, input<const char *> &in)
 {
     while (1) {
+        const size_t n = in.plain_run();
+        out.append(in.cur(), n);
+        in.skip(n);
         int ch = in.getc();
         if (ch < ' ') {
             in.ungetc();
             return false;
         } else if (ch == '"') {
             return true;
-        } else if (ch == '\\') {
-            if ((ch = in.getc()) == -1) {
-                return false;
-            }
-            switch (ch) {
-#define MAP(sym, val)                                                                                                              \
-  case sym:                                                                                                                        \
-    out.push_back(val);                                                                                                            \
-    break
-                MAP('"', '\"');
-                MAP('\\', '\\');
-                MAP('/', '/');
-                MAP('b', '\b');
-                MAP('f', '\f');
-                MAP('n', '\n');
-                MAP('r', '\r');
-                MAP('t', '\t');
-#undef MAP
-            case 'u':
-                if (!_parse_codepoint(out, in)) {
-                    return false;
-                }
-                break;
-            default:
-                return false;
-            }
-        } else {
-            out.push_back(static_cast<char>(ch));
+        } else if (!_parse_escape(out, in)) {
+            // ch can only be a backslash here
+            return false;
         }
     }
-    return false;
 }
 
 template <typename Context, typename Iter> bool _parse_array(Context &ctx, input<Iter> &in)
@@ -708,7 +712,7 @@ template <typename Context> NOINLINE bool _set_number(Context &ctx, const char *
         long_num.assign(start, len);
         s = long_num.c_str();
     }
-    return ctx.set_number(strtod(s, nullptr));
+    return ctx.set_number(AP_JSON_Number::to_double(s));
 }
 
 template <typename Context, typename Iter> bool _parse(Context &ctx, input<Iter> &in)
