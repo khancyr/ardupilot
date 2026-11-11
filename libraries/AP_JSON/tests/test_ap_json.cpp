@@ -277,4 +277,8 @@ TEST(AP_JSON, EmbeddedModelsLoad)
 }
 #endif
 
+// a growing array must move its values rather than deep copy them
+static_assert(std::is_nothrow_move_constructible<AP_JSON::value>::value, "value move must be noexcept");
+static_assert(std::is_nothrow_move_assignable<AP_JSON::value>::value, "value move must be noexcept");
+
 AP_GTEST_MAIN()
