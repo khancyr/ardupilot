@@ -123,45 +123,47 @@ private:
     SensorState state_rx;
 
     // fields of a JSON sensor packet, written to state_rx while parsing.
+    // Each may also be sent under a short alias in the root object, to
+    // keep packets small on slow links; see examples/JSON/readme.md.
     // Bit i of a received bitmask is fields[i], see DataKey below
     typedef AP_JSON_FieldParser::Type FT;
     const AP_JSON_FieldParser::Field fields[36] {
-        { "timestamp", nullptr, FT::DOUBLE, 1, &state_rx.timestamp_s },
-        { "latitude", nullptr, FT::DOUBLE, 1, &state_rx.latitude },
-        { "longitude", nullptr, FT::DOUBLE, 1, &state_rx.longitude },
-        { "altitude", nullptr, FT::DOUBLE, 1, &state_rx.altitude },
-        { "imu.gyro", nullptr, FT::FLOAT_ARRAY, 3, &state_rx.imu.gyro },
-        { "imu.accel_body", nullptr, FT::FLOAT_ARRAY, 3, &state_rx.imu.accel_body },
-        { "position", nullptr, FT::DOUBLE_ARRAY, 3, &state_rx.position },
-        { "attitude", nullptr, FT::FLOAT_ARRAY, 3, &state_rx.attitude },
-        { "quaternion", nullptr, FT::FLOAT_ARRAY, 4, &state_rx.quaternion.q1 },
-        { "velocity", nullptr, FT::FLOAT_ARRAY, 3, &state_rx.velocity },
-        { "rng_1", nullptr, FT::FLOAT, 1, &state_rx.rng[0] },
-        { "rng_2", nullptr, FT::FLOAT, 1, &state_rx.rng[1] },
-        { "rng_3", nullptr, FT::FLOAT, 1, &state_rx.rng[2] },
-        { "rng_4", nullptr, FT::FLOAT, 1, &state_rx.rng[3] },
-        { "rng_5", nullptr, FT::FLOAT, 1, &state_rx.rng[4] },
-        { "rng_6", nullptr, FT::FLOAT, 1, &state_rx.rng[5] },
-        { "velocity_wind", nullptr, FT::FLOAT_ARRAY, 3, &state_rx.velocity_wind },
-        { "windvane.direction", nullptr, FT::FLOAT, 1, &state_rx.wind_vane_apparent.direction },
-        { "windvane.speed", nullptr, FT::FLOAT, 1, &state_rx.wind_vane_apparent.speed },
-        { "airspeed", nullptr, FT::FLOAT, 1, &state_rx.airspeed },
+        { "timestamp", "t", FT::DOUBLE, 1, &state_rx.timestamp_s },
+        { "latitude", "lat", FT::DOUBLE, 1, &state_rx.latitude },
+        { "longitude", "lon", FT::DOUBLE, 1, &state_rx.longitude },
+        { "altitude", "alt", FT::DOUBLE, 1, &state_rx.altitude },
+        { "imu.gyro", "g", FT::FLOAT_ARRAY, 3, &state_rx.imu.gyro },
+        { "imu.accel_body", "a", FT::FLOAT_ARRAY, 3, &state_rx.imu.accel_body },
+        { "position", "p", FT::DOUBLE_ARRAY, 3, &state_rx.position },
+        { "attitude", "e", FT::FLOAT_ARRAY, 3, &state_rx.attitude },
+        { "quaternion", "q", FT::FLOAT_ARRAY, 4, &state_rx.quaternion.q1 },
+        { "velocity", "v", FT::FLOAT_ARRAY, 3, &state_rx.velocity },
+        { "rng_1", "r1", FT::FLOAT, 1, &state_rx.rng[0] },
+        { "rng_2", "r2", FT::FLOAT, 1, &state_rx.rng[1] },
+        { "rng_3", "r3", FT::FLOAT, 1, &state_rx.rng[2] },
+        { "rng_4", "r4", FT::FLOAT, 1, &state_rx.rng[3] },
+        { "rng_5", "r5", FT::FLOAT, 1, &state_rx.rng[4] },
+        { "rng_6", "r6", FT::FLOAT, 1, &state_rx.rng[5] },
+        { "velocity_wind", "vw", FT::FLOAT_ARRAY, 3, &state_rx.velocity_wind },
+        { "windvane.direction", "wd", FT::FLOAT, 1, &state_rx.wind_vane_apparent.direction },
+        { "windvane.speed", "ws", FT::FLOAT, 1, &state_rx.wind_vane_apparent.speed },
+        { "airspeed", "as", FT::FLOAT, 1, &state_rx.airspeed },
         { "no_time_sync", nullptr, FT::BOOL, 1, &state_rx.no_time_sync },
         { "no_lockstep", nullptr, FT::BOOL, 1, &state_rx.no_lockstep },
-        { "rc.rc_1", nullptr, FT::FLOAT, 1, &state_rx.rc[0] },
-        { "rc.rc_2", nullptr, FT::FLOAT, 1, &state_rx.rc[1] },
-        { "rc.rc_3", nullptr, FT::FLOAT, 1, &state_rx.rc[2] },
-        { "rc.rc_4", nullptr, FT::FLOAT, 1, &state_rx.rc[3] },
-        { "rc.rc_5", nullptr, FT::FLOAT, 1, &state_rx.rc[4] },
-        { "rc.rc_6", nullptr, FT::FLOAT, 1, &state_rx.rc[5] },
-        { "rc.rc_7", nullptr, FT::FLOAT, 1, &state_rx.rc[6] },
-        { "rc.rc_8", nullptr, FT::FLOAT, 1, &state_rx.rc[7] },
-        { "rc.rc_9", nullptr, FT::FLOAT, 1, &state_rx.rc[8] },
-        { "rc.rc_10", nullptr, FT::FLOAT, 1, &state_rx.rc[9] },
-        { "rc.rc_11", nullptr, FT::FLOAT, 1, &state_rx.rc[10] },
-        { "rc.rc_12", nullptr, FT::FLOAT, 1, &state_rx.rc[11] },
-        { "battery.voltage", nullptr, FT::FLOAT, 1, &state_rx.bat_volt },
-        { "battery.current", nullptr, FT::FLOAT, 1, &state_rx.bat_amp },
+        { "rc.rc_1", "c1", FT::FLOAT, 1, &state_rx.rc[0] },
+        { "rc.rc_2", "c2", FT::FLOAT, 1, &state_rx.rc[1] },
+        { "rc.rc_3", "c3", FT::FLOAT, 1, &state_rx.rc[2] },
+        { "rc.rc_4", "c4", FT::FLOAT, 1, &state_rx.rc[3] },
+        { "rc.rc_5", "c5", FT::FLOAT, 1, &state_rx.rc[4] },
+        { "rc.rc_6", "c6", FT::FLOAT, 1, &state_rx.rc[5] },
+        { "rc.rc_7", "c7", FT::FLOAT, 1, &state_rx.rc[6] },
+        { "rc.rc_8", "c8", FT::FLOAT, 1, &state_rx.rc[7] },
+        { "rc.rc_9", "c9", FT::FLOAT, 1, &state_rx.rc[8] },
+        { "rc.rc_10", "c10", FT::FLOAT, 1, &state_rx.rc[9] },
+        { "rc.rc_11", "c11", FT::FLOAT, 1, &state_rx.rc[10] },
+        { "rc.rc_12", "c12", FT::FLOAT, 1, &state_rx.rc[11] },
+        { "battery.voltage", "bv", FT::FLOAT, 1, &state_rx.bat_volt },
+        { "battery.current", "bc", FT::FLOAT, 1, &state_rx.bat_amp },
     };
     AP_JSON_FieldParser parser{fields, ARRAY_SIZE(fields)};
 
@@ -213,6 +215,22 @@ private:
     // rejected, while sensors may send them for having no reading
     static const uint64_t STATE_FIELDS = TIMESTAMP | LATITUDE | LONGITUDE | ALTITUDE | GYRO |
         ACCEL_BODY | POSITION | EULER_ATT | QUAT_ATT | VELOCITY;
+
+    /*
+      Slow changing optional fields do not need to be sent in every
+      packet: their last value is held for FIELD_HOLD_S of physics time.
+      Fields describing the vehicle state (attitude, position and so
+      on) are never held, as a stale value would be silently wrong.
+     */
+    static constexpr double FIELD_HOLD_S = 0.5;
+    static const uint64_t HOLDABLE_FIELDS =
+        RNG_1 | RNG_2 | RNG_3 | RNG_4 | RNG_5 | RNG_6 |
+        WIND_VEL | WIND_DIR | WIND_SPD | AIRSPEED | TIME_SYNC | LOCKSTEP |
+        RC_1 | RC_2 | RC_3 | RC_4 | RC_5 | RC_6 |
+        RC_7 | RC_8 | RC_9 | RC_10 | RC_11 | RC_12 |
+        BAT_VOLT | BAT_AMP;
+    double field_received_s[ARRAY_SIZE(fields)];
+    uint64_t hold_fields(uint64_t received_bitmask);
 
     uint32_t rejected_packets;
 

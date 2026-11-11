@@ -137,6 +137,28 @@ void JSON::output_servos(const struct sitl_input &input)
 }
 
 
+/*
+  hold the last value of slow changing optional fields for FIELD_HOLD_S
+  of physics time, so a physics backend can send them at a lower rate
+  than the main state. Returns the bitmask of fields to use
+ */
+uint64_t JSON::hold_fields(uint64_t received_bitmask)
+{
+    uint64_t use = received_bitmask;
+    for (uint8_t i=0; i<ARRAY_SIZE(fields); i++) {
+        const uint64_t bit = 1ULL << i;
+        if (received_bitmask & bit) {
+            field_received_s[i] = state.timestamp_s;
+        } else if ((HOLDABLE_FIELDS & bit) &&
+                   (last_received_bitmask & bit) &&
+                   state.timestamp_s >= field_received_s[i] &&  // not after a physics reset
+                   state.timestamp_s - field_received_s[i] <= FIELD_HOLD_S) {
+            use |= bit;
+        }
+    }
+    return use;
+}
+
 // rate limit reports of bad sensor packets to 1Hz
 bool JSON::report_parse_error()
 {
@@ -308,11 +330,12 @@ void JSON::recv_fdm(const struct sitl_input &input)
         return;
     }
 
-    const uint64_t received_bitmask = parse_sensors(recv_buffer, ret);
+    uint64_t received_bitmask = parse_sensors(recv_buffer, ret);
     if (received_bitmask == 0) {
         // no complete valid packet yet; parse_sensors() reports bad ones
         return;
     }
+    received_bitmask = hold_fields(received_bitmask);
 
     // Must get either attitude or quaternion fields
     if ((received_bitmask & (EULER_ATT | QUAT_ATT)) == 0) {
