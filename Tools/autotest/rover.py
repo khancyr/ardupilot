@@ -8619,6 +8619,48 @@ return update()
                 physics.set(rng_1=5.0)
                 self.wait_rangefinder_distance(4.9, 5.1)
 
+    def JSONCompactPackets(self):
+        '''check SITL's JSON model takes compact packets: short keys, a CRC,
+        and slow fields sent now and then'''
+        with self.JSON_physics() as physics:
+            self.set_parameters({
+                "RNGFND1_TYPE": 100,
+                "BATT_MONITOR": 4,
+            })
+            self.reboot_sitl()
+            physics.framing = lambda text: text + b'*%04X\n' % binascii.crc_hqx(text, 0xFFFF)
+
+            # short keys for the IMU; for attitude the full name wins
+            # while both are sent
+            physics.set(imu=None, g=[0, 0, 0], a=[0, 0, -9.80665], e=[0, 0, math.radians(90)])
+            self.delay_sim_time(2, reason="short keys")
+            self.wait_message_field_values('SIMSTATE', {'yaw': 0}, epsilon=0.01)
+            physics.set(attitude=None)
+            self.wait_message_field_values('SIMSTATE', {'yaw': math.radians(90)}, epsilon=0.01)
+
+            # battery and rangefinder in one packet in 8 hold their value
+            # between packets: a gap would read as the default voltage and
+            # pull the averaged reading down
+            physics.set(bv=15.4, r1=4.0)
+            physics.every = {'bv': 8, 'r1': 8}
+            self.wait_rangefinder_distance(3.9, 4.1)
+            self.wait_message_field_values('SYS_STATUS', {'voltage_battery': 15400}, epsilon=50)
+            self.context_push()
+            try:
+                self.context_collect('SYS_STATUS')
+                self.delay_sim_time(5, reason="slow fields held")
+                voltages = [m.voltage_battery for m in self.context_collection('SYS_STATUS')]
+            finally:
+                self.context_pop()
+            self.progress("voltage %u-%umV over %u samples" % (min(voltages), max(voltages), len(voltages)))
+            if min(voltages) < 15350 or max(voltages) > 15450:
+                raise NotAchievedException("battery voltage not held between packets")
+
+            # once they stop, they time out
+            default_mv = self.get_parameter("SIM_BATT_VOLTAGE") * 1000
+            physics.set(bv=None)
+            self.wait_message_field_values('SYS_STATUS', {'voltage_battery': default_mv}, epsilon=50, timeout=10)
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestRover, self).tests()
@@ -8761,6 +8803,7 @@ return update()
             self.JSONClock,
             self.JSONSensors,
             self.JSONBadPackets,
+            self.JSONCompactPackets,
         ])
         return ret
 

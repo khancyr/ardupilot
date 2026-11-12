@@ -59,6 +59,9 @@ class JSONPhysics(object):
         # gets a normal reply, so bad and good packets alternate
         self.injected: deque[bytes] = deque()
         self.injected_frame: int | None = None
+        # fields sent in one reply out of n, as slow sensors in compact
+        # packets: {'bv': 8} sends bv in every 8th reply
+        self.every: dict[str, int] = {}
         # makes the bytes sent from the JSON text of a reply
         self.framing: Callable[[bytes], bytes] = lambda text: b'\n' + text + b'\n'
         # frames SITL sent again because it had no usable reply
@@ -128,6 +131,9 @@ class JSONPhysics(object):
         vel = self.state['velocity']
         self.state['position'] = [p + v * self.dt for p, v in zip(pos, vel)]
         msg = dict(self.state, timestamp=self.timestamp)
+        for name, n in self.every.items():
+            if self.replies % n != 0:
+                msg.pop(name, None)
         # compact separators keep packets small; json.dumps writes
         # infinity and NaN as Infinity and NaN, which SIM_JSON accepts
         text = json.dumps(msg, separators=(',', ':'))

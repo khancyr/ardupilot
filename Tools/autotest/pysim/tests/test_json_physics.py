@@ -85,6 +85,14 @@ def test_raw_fields() -> None:
     assert json.loads(msg)['rng_1'] == 4.0 and b'rng_2' not in msg
 
 
+def test_every() -> None:
+    p = JSONPhysics()
+    p.set(bv=12.5)
+    p.every = {'bv': 3}
+    sent = ['"bv"' in reply(p, pkt(n)).decode() for n in range(7)]
+    assert sent == [True, False, False, True, False, False, True]
+
+
 def test_injected() -> None:
     p = JSONPhysics(dt=0.01)
     reply(p, pkt(0))
