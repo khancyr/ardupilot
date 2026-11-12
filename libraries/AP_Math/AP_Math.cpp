@@ -186,6 +186,10 @@ float wrap_360(const float angle)
     float res = fmodf(angle, 360.0f);
     if (res < 0) {
         res += 360.0f;
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= 360.0f) {
+            res = 0;
+        }
     }
     return res;
 }
@@ -196,6 +200,10 @@ double wrap_360(const double angle)
     double res = fmod(angle, 360.0);
     if (res < 0) {
         res += 360.0;
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= 360.0) {
+            res = 0;
+        }
     }
     return res;
 }
@@ -215,6 +223,10 @@ float wrap_360_cd(const float angle)
     float res = fmodf(angle, 36000.0f);
     if (res < 0) {
         res += 36000.0f;
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= 36000.0f) {
+            res = 0;
+        }
     }
     return res;
 }
@@ -225,6 +237,10 @@ double wrap_360_cd(const double angle)
     double res = fmod(angle, 36000.0);
     if (res < 0) {
         res += 36000.0;
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= 36000.0) {
+            res = 0;
+        }
     }
     return res;
 }
@@ -253,6 +269,10 @@ float wrap_2PI(const float radian)
     float res = fmodf(radian, float(M_2PI));
     if (res < 0) {
         res += float(M_2PI);
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= float(M_2PI)) {
+            res = 0;
+        }
     }
     return res;
 }
@@ -262,6 +282,10 @@ double wrap_2PI(const double radian)
     double res = fmod(radian, M_2PI);
     if (res < 0) {
         res += M_2PI;
+        // rounding can turn a tiny negative res into exactly the period
+        if (res >= M_2PI) {
+            res = 0;
+        }
     }
     return res;
 }
