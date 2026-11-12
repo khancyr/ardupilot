@@ -136,7 +136,7 @@ Volts, current in Amps:
 
 ## Debugging
 
-When first connecting you will see a message reporting what fields were successfully received. If any of the mandatory fields are missing SITL will stop, however it will run without the optional fields. This message can be used to double check SITL is receiving everything being sent by the physics backend.
+When first connecting you will see a message reporting what fields were successfully received. If any of the mandatory fields are missing SITL rejects the packet and waits for a complete one, however it will run without the optional fields. This message can be used to double check SITL is receiving everything being sent by the physics backend.
 
 For example:
 
@@ -150,3 +150,37 @@ JSON received:
         velocity
         rng_1
 ```
+
+### Rejected packets
+
+SITL uses a packet only if all of it is valid; nothing from a rejected packet is used. It then sends the
+same servo frame again and waits for the next packet, so simulated time stands still until a valid one
+arrives. Rejections are reported at most once a second, with a count of all rejected packets so far:
+
+```text
+JSON: rejected sensor packet: duplicate key, 3 rejected
+```
+
+| Message | Cause |
+| ------- | ----- |
+| `rejected sensor packet: <reason>` | The packet is not valid JSON or does not match the fields above, see below |
+| `sensor packet missing: <fields>` | A mandatory field is missing |
+| `sensor packet with infinity or NaN in: <fields>` | The vehicle state holds infinity or NaN; only sensors may send them |
+| `sensor datagram too large` | The datagram is over 4kB |
+
+Common reasons for `rejected sensor packet`:
+
+| Reason | Cause |
+| ------ | ----- |
+| `wrong type of value for field` | e.g. `true` where a number is expected, or `null` for a boolean |
+| `string where a field value was expected` | e.g. `"5"` where a number is expected |
+| `array field has the wrong number of elements` | e.g. 2 values for `velocity` |
+| `array where a single value was expected`, `number where an array was expected` | |
+| `duplicate key` | The same field given twice, or a field given both by its full name and inside a repeated object |
+| `line ended inside the packet` | A newline in the middle of the packet: packets must be on one line, e.g. not pretty printed |
+| `invalid number`, `leading zero in number` | e.g. `1.`, `1e`, `01`; write `1.0`, `1e0`, `1` |
+| `invalid value`, `invalid literal` | e.g. `.5`, `+1`, `True`, `'text'`, or a spelling of infinity or NaN not listed above such as `Inf` |
+| `CRC mismatch`, `invalid CRC` | The CRC suffix does not match the packet, or is not 4 hex digits |
+| `unexpected data after the packet` | Anything but whitespace or a CRC after the closing `}` |
+| `packet too long` | Over 4096 bytes |
+| `nesting too deep` | Objects and arrays nested more than 8 deep |
