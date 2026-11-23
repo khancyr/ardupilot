@@ -1136,6 +1136,14 @@ class SITLBoard(Board):
             fun(bld)
         super().pre_build(bld)
 
+
+def build_json_for_size(cfg):
+    '''AP_JSON loads files once, so on boards short of flash build it for
+    size even when the board is optimised for speed; not in debug builds'''
+    if not cfg.env.DEBUG:
+        cfg.env.AP_LIB_EXTRA_CXXFLAGS['AP_JSON'] = ['-Os']
+
+
 class esp32(Board):
     abstract = True
     # the hwdef is read in configure_env(), after the toolchain is chosen,
@@ -1152,6 +1160,7 @@ class esp32(Board):
 
         super(esp32, self).configure_env(cfg, env)
         cfg.load('esp32')
+        build_json_for_size(cfg)
         env.DEFINES.update(
             CONFIG_HAL_BOARD = 'HAL_BOARD_ESP32',
         )
@@ -1258,6 +1267,7 @@ class chibios(Board):
         cfg.load('chibios')
         env.BOARD = self.name
         env.BOARD_CLASS = "ChibiOS"
+        build_json_for_size(cfg)
 
         env.DEFINES.update(
             CONFIG_HAL_BOARD = 'HAL_BOARD_CHIBIOS',
