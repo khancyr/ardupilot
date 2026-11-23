@@ -32,8 +32,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma GCC optimize("Os")
-
 #define AP_MATH_ALLOW_DOUBLE_FUNCTIONS 1
 
 #include "AP_JSON.h"
